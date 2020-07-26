@@ -1,0 +1,48 @@
+[[Collidables]]
+Pos = { X = 12.25, Y = 232.75 }
+Size = { X = 75.00, Y = -20.50 }
+[[Collidables]]
+Pos = { X = 79.25, Y = 220.00 }
+Size = { X = 123.25, Y = 15.00 }
+[[Collidables]]
+Pos = { X = 194.00, Y = 231.75 }
+Size = { X = 103.00, Y = -14.50 }
+[[Collidables]]
+Pos = { X = 289.00, Y = 224.50 }
+Size = { X = 89.50, Y = 13.00 }
+[[Collidables]]
+Pos = { X = 368.75, Y = 233.00 }
+Size = { X = 31.75, Y = -48.50 }
+[[Collidables]]
+Pos = { X = 395.25, Y = 190.25 }
+Size = { X = 34.50, Y = -54.50 }
+[[Collidables]]
+Pos = { X = 418.00, Y = 151.00 }
+Size = { X = -36.00, Y = -54.75 }
+[[Collidables]]
+Pos = { X = 389.50, Y = 103.00 }
+Size = { X = 25.75, Y = -58.00 }
+[[Collidables]]
+Pos = { X = 413.25, Y = 59.25 }
+Size = { X = -149.50, Y = -20.00 }
+[[Collidables]]
+Pos = { X = 268.25, Y = 46.00 }
+Size = { X = -121.00, Y = 22.25 }
+[[Collidables]]
+Pos = { X = 155.50, Y = 66.00 }
+Size = { X = -83.25, Y = -16.75 }
+[[Collidables]]
+Pos = { X = 78.25, Y = 54.50 }
+Size = { X = -51.50, Y = 23.75 }
+[[Collidables]]
+Pos = { X = 32.00, Y = 75.50 }
+Size = { X = -19.25, Y = 96.50 }
+[[Collidables]]
+Pos = { X = 17.50, Y = 165.25 }
+Size = { X = 37.50, Y = 62.75 }
+[[Collidables]]
+Pos = { X = 135.25, Y = 184.00 }
+Size = { X = 66.25, Y = -20.75 }
+[[Collidables]]
+Pos = { X = 242.25, Y = 160.75 }
+Size = { X = 70.25, Y = -26.25 }

@@ -1,0 +1,281 @@
+
+[Components.builtin_steering]
+
+Usable = false
+PortKind = "builtin"
+InputPins = [
+	{ Position = { X = -12.0, Y = 0.0 } },
+	{ Position = { X = 12.0, Y = 0.0 } }
+]
+
+[Components.builtin_acceleration]
+
+Usable = false
+PortKind = "builtin"
+InputPins = [
+	{ Position = { X = -12.0, Y = 0.0 } }
+]
+
+[Components.builtin_braking]
+
+Usable = false
+PortKind = "builtin"
+InputPins = [
+	{ Position = { X = -12.0, Y = 0.0 } }
+]
+
+
+[Components.add]
+
+Usable = true
+PortKind = "chip"
+InputPins = [
+	{ Position = { X = -12.0, Y = 8.0 } },
+	{ Position = { X = -12.0, Y = 0.0 } },
+	{ Position = { X = -12.0, Y = -8.0 } }
+]
+OutputPins = [
+	{ Position = { X = 12.0, Y = 0.0 } }
+]
+
+[Components.subtract]
+
+Usable = true
+PortKind = "chip"
+InputPins = [
+	{ Position = { X = -12.0, Y = 8.0 } },
+	{ Position = { X = -12.0, Y = -8.0 } }
+]
+OutputPins = [
+	{ Position = { X = 12.0, Y = 0.0 } }
+]
+
+[Components.split_signal]
+
+Usable = true
+PortKind = "chip"
+InputPins = [
+	{ Position = { X = -12.0, Y = 0.0 } },
+]
+OutputPins = [
+	{ Position = { X = 12.0, Y = 8.0 } },
+	{ Position = { X = 12.0, Y = 0.0 } },
+	{ Position = { X = 12.0, Y = -8.0 } }
+]
+
+[Components.compare_equals]
+
+Usable = true
+PortKind = "chip"
+InputPins = [
+	{ Position = { X = -12.0, Y = 8.0 } },
+	{ Position = { X = -12.0, Y = -8.0 } }
+]
+OutputPins = [
+	{ Position = { X = 12.0, Y = 0.0 } }
+]
+
+[Components.multiply]
+
+Usable = true
+PortKind = "chip"
+InputPins = [
+	{ Position = { X = -12.0, Y = 8.0 } },
+	{ Position = { X = -12.0, Y = 0.0 } },
+	{ Position = { X = -12.0, Y = -8.0 } }
+]
+OutputPins = [
+	{ Position = { X = 12.0, Y = 0.0 } }
+]
+
+[Components.constant]
+
+Usable = true
+PortKind = "chip"
+OutputPins = [
+	{ Position = { X = 12.0, Y = 8.0 } },
+	{ Position = { X = 12.0, Y = 0.0 } },
+	{ Position = { X = 12.0, Y = -8.0 } }
+]
+
+
+[Components.radar]
+
+Usable = true
+PortKind = "sensor"
+OutputPins = [
+	{ Position = { X = -0.0, Y = -16.0 } }
+]
+
+[Components.radar_shortrange]
+
+Usable = true
+PortKind = "sensor"
+OutputPins = [
+	{ Position = { X = -0.0, Y = -16.0 } }
+]
+
+[[Ports]]
+PortKind = "builtin"
+HoodPosition = { X = 36.0, Y = 20.0 }
+Prefill = "builtin_steering"
+
+[[Ports]]
+PortKind = "builtin"
+HoodPosition = { X = 104.0, Y = 20.0 }
+
+[[Ports]]
+PortKind = "builtin"
+HoodPosition = { X = 154.0, Y = 20.0 }
+Prefill = "builtin_acceleration"
+
+[[Ports]]
+PortKind = "builtin"
+HoodPosition = { X = 215.0, Y = 20.0 }
+Prefill = "builtin_braking"
+
+
+# Left forward sensor
+[[Ports]]
+WorldPosition = { X = 7.0, Y = 5.0 }
+HoodPosition = { X = 71.0, Y = 247.0 }
+Direction = { X = 1.0, Y = 0.0 }
+
+PortKind = "sensor"
+
+# Right forward sensor
+[[Ports]]
+WorldPosition = { X = 7.0, Y = -5.0 }
+HoodPosition = { X = 185.0, Y = 247.0 }
+Direction = { X = 1.0, Y = 0.0 }
+
+PortKind = "sensor"
+
+# Left side sensor
+[[Ports]]
+WorldPosition = { X = 3.0, Y = 5.0 }
+HoodPosition = { X = 10.0, Y = 205.0 }
+Direction = { X = 0.0, Y = 1.0 }
+
+PortKind = "sensor"
+
+# Right side sensor
+[[Ports]]
+WorldPosition = { X = 3.0, Y = -5.0 }
+HoodPosition = { X = 246.0, Y = 205.0 }
+Direction = { X = 0.0, Y = -1.0 }
+
+PortKind = "sensor"
+
+# Left diagonal sensor
+[[Ports]]
+WorldPosition = { X = 6.0, Y = 5.0 }
+HoodPosition = { X = 20.0, Y = 235.0 }
+Direction = { X = 1.0, Y = 1.0 }
+
+PortKind = "sensor"
+
+# Right diagonal sensor
+[[Ports]]
+WorldPosition = { X = 6.0, Y = -5.0 }
+HoodPosition = { X = 236.0, Y = 235.0 }
+Direction = { X = 1.0, Y = -1.0 }
+
+PortKind = "sensor"
+
+
+# Upper block of chips
+
+[[Ports]]
+HoodPosition = { X = 57.0, Y = 219.0 }
+
+PortKind = "chip"
+
+[[Ports]]
+HoodPosition = { X = 89.0, Y = 219.0 }
+
+PortKind = "chip"
+
+[[Ports]]
+HoodPosition = { X = 153.0, Y = 219.0 }
+
+PortKind = "chip"
+
+[[Ports]]
+HoodPosition = { X = 185.0, Y = 219.0 }
+
+PortKind = "chip"
+
+
+# Center block of chips
+
+[[Ports]]
+HoodPosition = { X = 25.0, Y = 180.0 }
+
+PortKind = "chip"
+
+[[Ports]]
+HoodPosition = { X = 57.0, Y = 180.0 }
+
+PortKind = "chip"
+
+[[Ports]]
+HoodPosition = { X = 89.0, Y = 180.0 }
+
+PortKind = "chip"
+
+[[Ports]]
+HoodPosition = { X = 121.0, Y = 180.0 }
+
+PortKind = "chip"
+
+[[Ports]]
+HoodPosition = { X = 153.0, Y = 180.0 }
+
+PortKind = "chip"
+
+[[Ports]]
+HoodPosition = { X = 185.0, Y = 180.0 }
+
+PortKind = "chip"
+
+[[Ports]]
+HoodPosition = { X = 217.0, Y = 180.0 }
+
+PortKind = "chip"
+
+
+[[Ports]]
+HoodPosition = { X = 25.0, Y = 148.0 }
+
+PortKind = "chip"
+
+[[Ports]]
+HoodPosition = { X = 57.0, Y = 148.0 }
+
+PortKind = "chip"
+
+[[Ports]]
+HoodPosition = { X = 89.0, Y = 148.0 }
+
+PortKind = "chip"
+
+[[Ports]]
+HoodPosition = { X = 121.0, Y = 148.0 }
+
+PortKind = "chip"
+
+[[Ports]]
+HoodPosition = { X = 153.0, Y = 148.0 }
+
+PortKind = "chip"
+
+[[Ports]]
+HoodPosition = { X = 185.0, Y = 148.0 }
+
+PortKind = "chip"
+
+[[Ports]]
+HoodPosition = { X = 217.0, Y = 148.0 }
+
+PortKind = "chip"

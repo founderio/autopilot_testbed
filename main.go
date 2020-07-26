@@ -14,6 +14,7 @@ import (
 
 	"founderio.net/eljam/elcar"
 	"founderio.net/eljam/world"
+	"github.com/BurntSushi/toml"
 	"github.com/faiface/pixel"
 	"github.com/faiface/pixel/imdraw"
 	"github.com/faiface/pixel/pixelgl"
@@ -45,26 +46,21 @@ func loadPicture(filename string) (pixel.Picture, error) {
 var (
 	fontAtlas *text.Atlas
 
-	carHoodSprite     *pixel.Sprite
-	componentEmpty    *pixel.Sprite
-	componentMultiply *pixel.Sprite
-	componentAdd      *pixel.Sprite
-	componentUnknown  *pixel.Sprite
+	carHoodSprite *pixel.Sprite
 
-	componentSteerLeft  *pixel.Sprite
-	componentSteerRight *pixel.Sprite
-	componentAccelerate *pixel.Sprite
-	componentBrake      *pixel.Sprite
-
-	componentRadar *pixel.Sprite
-	// componentSteerRight *pixel.Sprite
-	// componentAccelerate *pixel.Sprite
-	// componentBrake      *pixel.Sprite
+	componentEmpty   *pixel.Sprite
+	componentUnknown *pixel.Sprite
 
 	componentSprites map[string]*pixel.Sprite
 
-	componentLocations []pixel.Vec
-	allowedComponents  [][]string
+	spritePinIn      *pixel.Sprite
+	spritePinOut     *pixel.Sprite
+	spriteChipPort   *pixel.Sprite
+	spriteSensorPort *pixel.Sprite
+)
+
+var (
+	componentList []string
 )
 
 var (
@@ -72,11 +68,14 @@ var (
 )
 
 var (
-	hoodScale           float64 = 3
-	worldScale          float64 = 4
+	hoodScale  float64 = 3
+	worldScale float64 = 4
+
 	connectingFromState int
 	connectingFromID    int
 	connectingFromPort  int
+
+	selectingComponent string
 )
 
 const (
@@ -88,12 +87,31 @@ const (
 func run() {
 	cfg := pixelgl.WindowConfig{
 		Title:  "Electronics Jam",
-		Bounds: pixel.R(0, 0, 1920, 1080),
+		Bounds: pixel.R(0, 0, 1800, 1000),
 	}
 	win, err := pixelgl.NewWindow(cfg)
 	if err != nil {
 		panic(err)
 	}
+
+	_, err = toml.DecodeFile(filepath.Join("resources", "definitions.toml"), &elcar.Definitions)
+	if err != nil {
+		panic(err)
+	}
+
+	for typeName, def := range elcar.Definitions.Components {
+		if def.Usable {
+			componentList = append(componentList, typeName)
+		}
+	}
+
+	var world *world.Objects
+	_, err = toml.DecodeFile(filepath.Join("resources", "world.toml"), &world)
+	if err != nil {
+		panic(err)
+	}
+	// For now, calculate from screen size - later on we need to draw a border and add camera panning
+	world.WorldBorder = pixel.R(0, 0, 1920/worldScale, 1080/worldScale)
 
 	fontAtlas = text.NewAtlas(basicfont.Face7x13, text.ASCII)
 
@@ -115,84 +133,67 @@ func run() {
 	}
 	carHoodSprite = pixel.NewSprite(carHoodPic, carHoodPic.Bounds())
 
+	componentSprites = make(map[string]*pixel.Sprite)
+
 	componentSpriteSheet, err := loadPicture("components.png")
 	if err != nil {
 		panic(err)
 	}
-	componentEmpty = pixel.NewSprite(componentSpriteSheet, pixel.R(0, 96, 32, 128))
-	componentMultiply = pixel.NewSprite(componentSpriteSheet, pixel.R(32, 96, 64, 128))
-	componentAdd = pixel.NewSprite(componentSpriteSheet, pixel.R(64, 96, 96, 128))
-	componentUnknown = pixel.NewSprite(componentSpriteSheet, pixel.R(96, 96, 128, 128))
+	componentEmpty = pixel.NewSprite(componentSpriteSheet,
+		pixel.R(0, 96, 32, 128))
+	componentSprites[elcar.CTypeMultiply] = pixel.NewSprite(componentSpriteSheet,
+		pixel.R(32, 96, 64, 128))
+	componentSprites[elcar.CTypeAdd] = pixel.NewSprite(componentSpriteSheet,
+		pixel.R(64, 96, 96, 128))
+	componentUnknown = pixel.NewSprite(componentSpriteSheet,
+		pixel.R(96, 96, 128, 128))
 
-	componentSteerLeft = pixel.NewSprite(componentSpriteSheet, pixel.R(0, 64, 32, 96))
-	componentSteerRight = pixel.NewSprite(componentSpriteSheet, pixel.R(32, 64, 64, 96))
-	componentAccelerate = pixel.NewSprite(componentSpriteSheet, pixel.R(64, 64, 96, 96))
-	componentBrake = pixel.NewSprite(componentSpriteSheet, pixel.R(96, 64, 128, 96))
+	componentSprites[elcar.CTypeBuiltinSteering] = pixel.NewSprite(componentSpriteSheet,
+		pixel.R(0, 64, 32, 96))
+	componentSprites[elcar.CTypeSubtract] = pixel.NewSprite(componentSpriteSheet,
+		pixel.R(32, 64, 64, 96))
+	componentSprites[elcar.CTypeBuiltinAcceleration] = pixel.NewSprite(componentSpriteSheet,
+		pixel.R(64, 64, 96, 96))
+	componentSprites[elcar.CTypeBuiltinBraking] = pixel.NewSprite(componentSpriteSheet,
+		pixel.R(96, 64, 128, 96))
 
-	componentRadar = pixel.NewSprite(componentSpriteSheet, pixel.R(0, 32, 32, 64))
-	//component = pixel.NewSprite(componentSpriteSheet, pixel.R(32, 32, 64, 64))
-	//component = pixel.NewSprite(componentSpriteSheet, pixel.R(64, 32, 96, 64))
-	//component = pixel.NewSprite(componentSpriteSheet, pixel.R(96, 32, 128, 64))
+	componentSprites[elcar.CTypeRadar] = pixel.NewSprite(componentSpriteSheet,
+		pixel.R(0, 32, 32, 64))
+	componentSprites[elcar.CTypeCompareEquals] = pixel.NewSprite(componentSpriteSheet,
+		pixel.R(32, 32, 64, 64))
+	componentSprites[elcar.CTypeSplitSignal] = pixel.NewSprite(componentSpriteSheet,
+		pixel.R(64, 32, 96, 64))
+	componentSprites[elcar.CTypeRadarShortrange] = pixel.NewSprite(componentSpriteSheet,
+		pixel.R(96, 32, 128, 64))
 
-	//component = pixel.NewSprite(componentSpriteSheet, pixel.R(0, 0, 32, 32))
-	//component = pixel.NewSprite(componentSpriteSheet, pixel.R(32, 0, 64, 32))
-	//component = pixel.NewSprite(componentSpriteSheet, pixel.R(64, 0, 96, 32))
-	//component = pixel.NewSprite(componentSpriteSheet, pixel.R(96, 0, 128, 32))
+	//componentSprites[elcar.CType] = pixel.NewSprite(componentSpriteSheet,
+	//	pixel.R(0, 0, 32, 32))
+	//componentSprites[elcar.CType] = pixel.NewSprite(componentSpriteSheet,
+	//	pixel.R(32, 0, 64, 32))
+	//componentSprites[elcar.CType] = pixel.NewSprite(componentSpriteSheet,
+	//	pixel.R(64, 0, 96, 32))
+	//componentSprites[elcar.CType] = pixel.NewSprite(componentSpriteSheet,
+	//	pixel.R(96, 0, 128, 32))
 
-	componentSprites = make(map[string]*pixel.Sprite)
-	componentSprites[elcar.CTypeAdd] = componentAdd
-	componentSprites[elcar.CTypeMultiply] = componentMultiply
-	componentSprites[elcar.CTypeRadar] = componentRadar
+	pcbSpriteSheet, err := loadPicture("pcb.png")
+	if err != nil {
+		panic(err)
+	}
+	spritePinIn = pixel.NewSprite(pcbSpriteSheet, pixel.R(0, 0, 6, 6))
+	spritePinOut = pixel.NewSprite(pcbSpriteSheet, pixel.R(0, 6, 6, 6+6))
+	spriteSensorPort = pixel.NewSprite(pcbSpriteSheet, pixel.R(20, 0, 20+14, 18))
+	spriteChipPort = pixel.NewSprite(pcbSpriteSheet, pixel.R(34, 0, 34+14, 18))
 
 	car = &elcar.Car{
-		Position: pixel.V(15, 120),
+		Position: pixel.V(150, 120),
 		Rotation: 0,
-		Speed:    15,
+		Speed:    0,
 	}
 
-	componentLocations = []pixel.Vec{
-		pixel.V(23, 256-44),  // ComponentSteerLeft
-		pixel.V(88, 256-44),  // ComponentSteerRight
-		pixel.V(138, 256-44), // ComponentAccelerate
-		pixel.V(199, 256-44), // ComponentBrake
-	}
-	allowedComponents = [][]string{
-		{}, // ComponentSteerLeft
-		{}, // ComponentSteerRight
-		{}, // ComponentAccelerate
-		{}, // ComponentBrake
-	}
-	// ComponentAny, front-facing sensor mounts
-
-	componentLocations = append(componentLocations, pixel.V(55, 256-25))
-	componentLocations = append(componentLocations, pixel.V(169, 256-25))
-	allowedComponents = append(allowedComponents, []string{elcar.CTypeRadar})
-	allowedComponents = append(allowedComponents, []string{elcar.CTypeRadar})
-
-	base := pixel.V(9, 256-85) // ComponentAny, internal chip mounts
-	for x := 0; x < 7; x++ {
-		for y := 0; y < 2; y++ {
-			componentLocations = append(componentLocations, base.Add(pixel.V(float64(x*32), float64(y*-32))))
-			allowedComponents = append(allowedComponents, []string{elcar.CTypeAdd, elcar.CTypeMultiply, elcar.CTypeConstant})
+	for idx, port := range elcar.Definitions.Ports {
+		if port.Prefill != "" {
+			car.AddComponent(idx, port.Prefill)
 		}
-	}
-
-	objects := &world.Objects{
-		WorldBorder: pixel.R(0, 0, 1920/worldScale, 1080/worldScale),
-		Collidables: []world.Collidable{
-			{
-				Pos:  pixel.V(20, 20),
-				Size: pixel.V(10, 15),
-			},
-			{
-				Pos:  pixel.V(150, 35),
-				Size: pixel.V(2, 2),
-			},
-			{
-				Pos:  pixel.V(300, 100),
-				Size: pixel.V(2, 200),
-			},
-		},
 	}
 
 	imd := imdraw.New(nil)
@@ -208,11 +209,11 @@ func run() {
 			hoodOpen = !hoodOpen
 		}
 
-		car.Update(dt, objects)
+		car.Update(dt, world)
 
 		win.Clear(colornames.Gainsboro)
 
-		for _, o := range objects.Collidables {
+		for _, o := range world.Collidables {
 			stoneSprite.Draw(win, pixel.IM.Moved(o.Bounds().Center()).Scaled(pixel.ZV, worldScale))
 
 			imd.Clear()
@@ -233,59 +234,113 @@ func run() {
 			imd.Color = colornames.Magenta
 			imd.EndShape = imdraw.SharpEndShape
 			imd.Push(car.Position.Scaled(worldScale), debug.Scaled(worldScale))
-			imd.Line(5)
+			imd.Line(1)
+			imd.Draw(win)
+		}
+
+		for _, debug := range car.DebugLines {
+			imd.Clear()
+
+			imd.Color = colornames.Magenta
+			imd.EndShape = imdraw.SharpEndShape
+			imd.Push(debug.A.Scaled(worldScale), debug.B.Scaled(worldScale))
+			imd.Line(1)
 			imd.Draw(win)
 		}
 
 		if hoodOpen {
 			drawHood(win, dt)
 			drawComponentSelector(win, dt)
+		} else {
+			if win.JustPressed(pixelgl.MouseButtonLeft) {
+				dragRectStartPoint = win.MousePosition().Scaled(1 / worldScale)
+			}
+			if win.JustReleased(pixelgl.MouseButtonLeft) {
+				dragRectEndPoint := win.MousePosition().Scaled(1 / worldScale)
+				rect := pixel.R(dragRectStartPoint.X, dragRectStartPoint.Y, dragRectEndPoint.X, dragRectEndPoint.Y)
+				fmt.Printf("[[Collidables]]\nPos = { X = %4.2f, Y = %4.2f }\nSize = { X = %4.2f, Y = %4.2f }\n",
+					rect.Min.X, rect.Min.Y, rect.Size().X, rect.Size().Y)
+			}
 		}
 
 		win.Update()
 	}
 }
 
+var dragRectStartPoint pixel.Vec
+
 func drawHood(win *pixelgl.Window, dt float64) {
 	carHoodSprite.Draw(win, pixel.IM.Moved(carHoodSprite.Frame().Center()).Scaled(pixel.ZV, hoodScale))
 
-	for idx, location := range componentLocations {
-		component := car.GetComponent(idx)
+	imd := imdraw.New(nil)
 
+	for idx, port := range elcar.Definitions.Ports {
 		var sprite *pixel.Sprite
-		switch idx {
-		case elcar.ComponentSteerLeft:
-			sprite = componentSteerLeft
-		case elcar.ComponentSteerRight:
-			sprite = componentSteerRight
-		case elcar.ComponentAccelerate:
-			sprite = componentAccelerate
-		case elcar.ComponentBrake:
-			sprite = componentBrake
-
-		default:
-			if component.State != nil {
-				var ok bool
-				sprite, ok = componentSprites[component.State.GetSpriteName()]
-				if !ok {
-					sprite = componentUnknown
-				}
-			}
+		switch port.PortKind {
+		case elcar.PortKindChip:
+			sprite = spriteChipPort
+		case elcar.PortKindSensor:
+			sprite = spriteSensorPort
 		}
 
 		if sprite != nil {
-			sprite.Draw(win, pixel.IM.Moved(location).Moved(pixel.V(16, 16)).Scaled(pixel.ZV, hoodScale))
+			sprite.Draw(win, pixel.IM.Moved(port.HoodPosition).Scaled(pixel.ZV, hoodScale))
 		}
+
+		component := car.GetComponent(idx)
+
+		if component.TypeName == "" {
+			continue
+		}
+
+		componentDef, ok := elcar.Definitions.Components[component.TypeName]
+		if !ok {
+			continue
+		}
+
+		for _, pin := range componentDef.InputPins {
+			imd.Clear()
+			imd.Color = colornames.Darkolivegreen
+			imd.EndShape = imdraw.RoundEndShape
+			imd.Push(port.HoodPosition.Scaled(hoodScale), port.HoodPosition.Add(pin.Position).Scaled(hoodScale))
+			imd.Line(5)
+			imd.Draw(win)
+
+			spritePinIn.Draw(win, pixel.IM.Moved(port.HoodPosition).Moved(pin.Position).Scaled(pixel.ZV, hoodScale))
+		}
+
+		for _, pin := range componentDef.OutputPins {
+			imd.Clear()
+			imd.Color = colornames.Darkolivegreen
+			imd.EndShape = imdraw.RoundEndShape
+			imd.Push(port.HoodPosition.Scaled(hoodScale), port.HoodPosition.Add(pin.Position).Scaled(hoodScale))
+			imd.Line(5)
+			imd.Draw(win)
+
+			spritePinOut.Draw(win, pixel.IM.Moved(port.HoodPosition).Moved(pin.Position).Scaled(pixel.ZV, hoodScale))
+		}
+
+		sprite = nil
+		sprite, ok = componentSprites[component.TypeName]
+		if !ok {
+			sprite = componentUnknown
+		}
+
+		if sprite != nil {
+			sprite.Draw(win, pixel.IM.Moved(port.HoodPosition).Scaled(pixel.ZV, hoodScale))
+		}
+
 		drawComponentConnections(win, idx)
 
 		if component.State != nil {
 			debug := component.State.GetDebugState()
 			if debug != "" {
-				basicTxt := text.New(location.Add(pixel.V(16, 0)).Scaled(hoodScale), fontAtlas)
+				basicTxt := text.New(port.HoodPosition.Add(pixel.V(0, -8)).Scaled(hoodScale), fontAtlas)
 				fmt.Fprintln(basicTxt, debug)
 				basicTxt.Draw(win, pixel.IM)
 			}
 		}
+
 	}
 
 	if win.JustReleased(pixelgl.MouseButtonRight) {
@@ -297,10 +352,11 @@ func drawHood(win *pixelgl.Window, dt float64) {
 	// Adjust to hood GUI scale
 	pos = pos.Scaled(1 / hoodScale)
 
-	for idx, location := range componentLocations {
+	for idx, port := range elcar.Definitions.Ports {
+
 		if idx >= elcar.ComponentAny {
 
-			rect := pixel.R(location.X+10, location.Y+7, location.X+24, location.Y+26)
+			rect := pixel.R(port.HoodPosition.X-7, port.HoodPosition.Y-9, port.HoodPosition.X+7, port.HoodPosition.Y+9)
 			if rect.Contains(pos) {
 
 				var tint color.Color
@@ -309,7 +365,7 @@ func drawHood(win *pixelgl.Window, dt float64) {
 				} else {
 					tint = color.Alpha{A: 40}
 				}
-				componentEmpty.DrawColorMask(win, pixel.IM.Moved(location).Moved(pixel.V(16, 16)).Scaled(pixel.ZV, hoodScale), tint)
+				componentEmpty.DrawColorMask(win, pixel.IM.Moved(port.HoodPosition).Scaled(pixel.ZV, hoodScale), tint)
 
 				// Change component
 				if mouseJustReleased {
@@ -317,7 +373,7 @@ func drawHood(win *pixelgl.Window, dt float64) {
 						connectingFromState = NotConnecting
 					} else if selectingComponent != "" {
 						if isComponentAllowedInSlot(idx, selectingComponent) {
-							car.AddComponent(idx, componentMakerFuncs[selectingComponent]())
+							car.AddComponent(idx, selectingComponent)
 							selectingComponent = ""
 						}
 					} else {
@@ -328,14 +384,24 @@ func drawHood(win *pixelgl.Window, dt float64) {
 
 		}
 
-		for i := 0; i < 3; i++ {
-			portPos := getInPortPosition(i).Add(location).Scaled(hoodScale)
-			if math.Abs(win.MousePosition().To(portPos).Len()) < 10 {
+		component := car.GetComponent(idx)
+		if component.TypeName == "" {
+			continue
+		}
 
-				imd := imdraw.New(nil)
+		componentDef, ok := elcar.Definitions.Components[component.TypeName]
+		if !ok {
+			continue
+		}
+
+		for i, pin := range componentDef.InputPins {
+			pinPos := pin.Position.Add(port.HoodPosition).Scaled(hoodScale)
+			if math.Abs(win.MousePosition().To(pinPos).Len()) < 10 {
+
+				imd.Clear()
 				imd.Color = colornames.Red
 				imd.EndShape = imdraw.RoundEndShape
-				imd.Push(portPos)
+				imd.Push(pinPos)
 				imd.Circle(10, 2)
 				imd.Draw(win)
 
@@ -354,23 +420,23 @@ func drawHood(win *pixelgl.Window, dt float64) {
 			if connectingFromState == ConnectingFromInput &&
 				connectingFromID == idx && connectingFromPort == i {
 
-				imd := imdraw.New(nil)
+				imd.Clear()
 				imd.Color = colornames.Blueviolet
 				imd.EndShape = imdraw.RoundEndShape
-				imd.Push(portPos, win.MousePosition())
+				imd.Push(pinPos, win.MousePosition())
 				imd.Line(5)
 				imd.Draw(win)
 			}
 		}
 
-		for i := 0; i < 3; i++ {
-			portPos := getOutPortPosition(i).Add(location).Scaled(hoodScale)
-			if math.Abs(win.MousePosition().To(portPos).Len()) < 10 {
+		for i, pin := range componentDef.OutputPins {
+			pinPos := pin.Position.Add(port.HoodPosition).Scaled(hoodScale)
+			if math.Abs(win.MousePosition().To(pinPos).Len()) < 10 {
 
-				imd := imdraw.New(nil)
+				imd.Clear()
 				imd.Color = colornames.Red
 				imd.EndShape = imdraw.RoundEndShape
-				imd.Push(portPos)
+				imd.Push(pinPos)
 				imd.Circle(10, 2)
 				imd.Draw(win)
 
@@ -389,38 +455,15 @@ func drawHood(win *pixelgl.Window, dt float64) {
 			if connectingFromState == ConnectingFromOutput &&
 				connectingFromID == idx && connectingFromPort == i {
 
-				imd := imdraw.New(nil)
+				imd.Clear()
 				imd.Color = colornames.Blueviolet
 				imd.EndShape = imdraw.RoundEndShape
-				imd.Push(portPos, win.MousePosition())
+				imd.Push(pinPos, win.MousePosition())
 				imd.Line(5)
 				imd.Draw(win)
 			}
 		}
 	}
-}
-
-var componentList = []string{
-	elcar.CTypeConstant,
-	elcar.CTypeAdd,
-	elcar.CTypeMultiply,
-	elcar.CTypeRadar,
-}
-var selectingComponent string
-
-var componentMakerFuncs = map[string]func() elcar.Component{
-	elcar.CTypeConstant: func() elcar.Component {
-		return &elcar.ConstantValue{}
-	},
-	elcar.CTypeAdd: func() elcar.Component {
-		return &elcar.AddComponent{}
-	},
-	elcar.CTypeMultiply: func() elcar.Component {
-		return &elcar.MultiplyComponent{}
-	},
-	elcar.CTypeRadar: func() elcar.Component {
-		return &elcar.ComponentRadar{}
-	},
 }
 
 func drawComponentSelector(win *pixelgl.Window, dt float64) {
@@ -461,52 +504,42 @@ func drawComponentSelector(win *pixelgl.Window, dt float64) {
 	}
 }
 
-var (
-	PinOffsetIn1  = pixel.V(4, 26)
-	PinOffsetIn2  = pixel.V(4, 17)
-	PinOffsetIn3  = pixel.V(4, 8)
-	PinOffsetOut1 = pixel.V(30, 26)
-	PinOffsetOut2 = pixel.V(30, 17)
-	PinOffsetOut3 = pixel.V(30, 8)
-)
-
-func getInPortPosition(port int) pixel.Vec {
-	switch port {
-	case 0:
-		return PinOffsetIn1
-	case 1:
-		return PinOffsetIn2
-	case 2:
-		return PinOffsetIn3
-	default:
+func getInPinPosition(typeName string, port int) pixel.Vec {
+	def, ok := elcar.Definitions.Components[typeName]
+	if !ok {
 		return pixel.ZV
 	}
+
+	if port < 0 || port >= len(def.InputPins) {
+		return pixel.ZV
+	}
+
+	return def.InputPins[port].Position
 }
 
-func getOutPortPosition(port int) pixel.Vec {
-	switch port {
-	case 0:
-		return PinOffsetOut1
-	case 1:
-		return PinOffsetOut2
-	case 2:
-		return PinOffsetOut3
-	default:
+func getOutPinPosition(typeName string, port int) pixel.Vec {
+	def, ok := elcar.Definitions.Components[typeName]
+	if !ok {
 		return pixel.ZV
 	}
+
+	if port < 0 || port >= len(def.OutputPins) {
+		return pixel.ZV
+	}
+
+	return def.OutputPins[port].Position
 }
 
 func isComponentAllowedInSlot(id int, typeName string) bool {
-	if id < 0 || id >= len(allowedComponents) {
+	if id < 0 || id >= len(elcar.Definitions.Ports) {
 		return false
 	}
-	allowed := allowedComponents[id]
-	for _, s := range allowed {
-		if s == typeName {
-			return true
-		}
+	portDef := elcar.Definitions.Ports[id]
+	componentDef, ok := elcar.Definitions.Components[typeName]
+	if !ok {
+		return false
 	}
-	return false
+	return portDef.PortKind == componentDef.PortKind
 }
 
 func drawComponentConnections(win *pixelgl.Window, id int) {
@@ -514,23 +547,28 @@ func drawComponentConnections(win *pixelgl.Window, id int) {
 	if len(comp.ConnectedOutputs) == 0 {
 		return
 	}
-	if id < 0 || id >= len(componentLocations) {
+	if id < 0 || id >= len(elcar.Definitions.Ports) {
 		return
 	}
 
-	pos := componentLocations[id]
+	pos := elcar.Definitions.Ports[id].HoodPosition
 
-	for outPort, conn := range comp.ConnectedOutputs {
+	for outPin, conn := range comp.ConnectedOutputs {
 
-		if conn.ID < 0 || conn.ID >= len(componentLocations) {
+		if conn.ID < 0 || conn.ID >= len(elcar.Definitions.Ports) {
 			continue
 		}
 
-		pinOffsetOut := getOutPortPosition(outPort)
+		targetComponent := car.GetComponent(conn.ID)
+		if targetComponent.State == nil {
+			continue
+		}
 
-		targetPos := componentLocations[conn.ID]
+		pinOffsetOut := getOutPinPosition(comp.TypeName, outPin)
 
-		pinOffsetIn := getInPortPosition(conn.Port)
+		targetPos := elcar.Definitions.Ports[conn.ID].HoodPosition
+
+		pinOffsetIn := getInPinPosition(targetComponent.TypeName, conn.Pin)
 
 		imd := imdraw.New(nil)
 		imd.Color = colornames.Red
