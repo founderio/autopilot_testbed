@@ -3,6 +3,7 @@ package elcar
 import (
 	"math"
 
+	"founderio.net/eljam/world"
 	"github.com/faiface/pixel"
 )
 
@@ -19,16 +20,22 @@ const (
 
 const (
 	CTypeAdd      = "add"
+	CTypeMultiply = "multiply"
 	CTypeRadar    = "radar"
 	CTypeConstant = "constant"
 )
+
+func absDistance(a, b pixel.Vec) float64 {
+	return math.Abs(a.To(b).Len())
+}
 
 type Car struct {
 	Position pixel.Vec
 	Rotation float64
 	Speed    float64
 
-	Components []UsedComponent
+	Components  []UsedComponent
+	DebugPoints []pixel.Vec
 }
 
 func (c *Car) GetComponent(id int) UsedComponent {
@@ -46,6 +53,15 @@ func (c *Car) AddComponent(id int, state Component) {
 	for i, component := range c.Components {
 		if component.ID == id {
 			component.State = state
+
+			// Ensure the connections are initialized and NOT connected to anything (-1)
+			//TODO: does not work, yet
+			component.ConnectedOutputs = make([]ComponentDestination, state.GetOutputCount())
+			for i, o := range component.ConnectedOutputs {
+				o.ID = -1
+				component.ConnectedOutputs[i] = o
+			}
+
 			c.Components[i] = component
 			return
 		}
@@ -88,9 +104,14 @@ func (c *Car) ConnectPorts(id, port, targetID, targetPort int) {
 	}
 }
 
-func (c *Car) Update(dt float64) {
-	dir := pixel.Unit(-c.Rotation).Scaled(c.Speed * dt)
-	c.Position = c.Position.Add(dir)
+func (c *Car) Forward() pixel.Vec {
+	return pixel.Unit(-c.Rotation)
+}
+
+func (c *Car) Update(dt float64, objects *world.Objects) {
+	// Clear debug points, they will be filled with each update
+	//TODO: this needs to happen in the electronics update
+	c.DebugPoints = make([]pixel.Vec, 0)
 
 	// Update electronics
 	outputValues := make([]OutputValue, 0, len(c.Components)*3)
@@ -111,27 +132,56 @@ func (c *Car) Update(dt float64) {
 	}
 
 	for _, component := range c.Components {
-		inputs := calculateComponentInputs(component.ID, component.State.GetInputCount(), outputValues)
-		component.State.SetInputs(inputs)
-		component.State.Update()
+		inputs, connected := calculateComponentInputs(component.ID, component.State.GetInputCount(), outputValues)
+		component.State.SetInputs(inputs, connected)
+		component.State.Update(c, objects)
 	}
-	steerLeft := calculateComponentInputs(ComponentSteerLeft, 1, outputValues)[0]
-	steerRight := calculateComponentInputs(ComponentSteerRight, 1, outputValues)[0]
-	accelerate := calculateComponentInputs(ComponentAccelerate, 1, outputValues)[0]
-	brake := calculateComponentInputs(ComponentBrake, 1, outputValues)[0]
+	steerLeft, _ := calculateComponentInputs(ComponentSteerLeft, 1, outputValues)
+	steerRight, _ := calculateComponentInputs(ComponentSteerRight, 1, outputValues)
+	accelerate, _ := calculateComponentInputs(ComponentAccelerate, 1, outputValues)
+	brake, _ := calculateComponentInputs(ComponentBrake, 1, outputValues)
 
 	const steerRate = math.Pi / 4
 	const acceleration = 3
 
 	//TODO: this needs to be separate from electronics logic!
-	c.Rotation += steerLeft * steerRate * dt
-	c.Rotation -= steerRight * steerRate * dt
-	c.Speed += accelerate * acceleration * dt
-	c.Speed -= brake * accelerate * dt
+	c.Rotation += steerLeft[0] * steerRate * dt
+	c.Rotation -= steerRight[0] * steerRate * dt
+	c.Speed += accelerate[0] * acceleration * dt
+	c.Speed -= brake[0] * acceleration * dt
+
+	dir := c.Forward().Scaled(c.Speed * dt)
+	newPosition := c.Position.Add(dir)
+	if !c.collidesWhenMovedTo(newPosition, objects) {
+		c.Position = newPosition
+	}
+
 }
 
-func calculateComponentInputs(id int, inputCount int, outputValues []OutputValue) []float64 {
+func (c *Car) collidesWhenMovedTo(pos pixel.Vec, objects *world.Objects) bool {
+
+	carWidth := float64(5)
+
+	// Stop at world border to contain the car
+	if !objects.WorldBorder.Contains(pos) {
+		return true
+	}
+
+	for _, o := range objects.Collidables {
+		edges := o.Bounds().Edges()
+		for _, edge := range edges {
+			closestOnLine := edge.Closest(pos)
+			if absDistance(closestOnLine, pos) < carWidth {
+				return true
+			}
+		}
+	}
+	return false
+}
+
+func calculateComponentInputs(id int, inputCount int, outputValues []OutputValue) ([]float64, []bool) {
 	inputs := make([]float64, inputCount)
+	connected := make([]bool, inputCount)
 	for _, value := range outputValues {
 		if value.DestinationComponent.ID != id {
 			continue
@@ -145,8 +195,9 @@ func calculateComponentInputs(id int, inputCount int, outputValues []OutputValue
 			inputs[value.DestinationComponent.Port],
 			value.Value,
 		)
+		connected[value.DestinationComponent.Port] = true
 	}
-	return inputs
+	return inputs, connected
 }
 
 func maxValue(a, b float64) float64 {
@@ -178,12 +229,14 @@ type ComponentDestination struct {
 }
 
 type Component interface {
-	Update()
+	Update(car *Car, objects *world.Objects)
 	GetSpriteName() string
+
+	GetDebugState() string
 
 	GetInputCount() int
 	GetOutputCount() int
 
-	SetInputs(values []float64)
+	SetInputs(values []float64, connected []bool)
 	GetOutputs() []float64
 }

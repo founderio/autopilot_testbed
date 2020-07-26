@@ -1,6 +1,7 @@
 package main
 
 import (
+	"fmt"
 	"image"
 	"math"
 	"os"
@@ -12,10 +13,13 @@ import (
 	_ "image/png"
 
 	"founderio.net/eljam/elcar"
+	"founderio.net/eljam/world"
 	"github.com/faiface/pixel"
 	"github.com/faiface/pixel/imdraw"
 	"github.com/faiface/pixel/pixelgl"
+	"github.com/faiface/pixel/text"
 	"golang.org/x/image/colornames"
+	"golang.org/x/image/font/basicfont"
 )
 
 const spriteFolder = "resources/sprites"
@@ -39,11 +43,13 @@ func loadPicture(filename string) (pixel.Picture, error) {
 }
 
 var (
-	carHoodSprite  *pixel.Sprite
-	componentEmpty *pixel.Sprite
-	//componentRadar      *pixel.Sprite
-	componentAdd     *pixel.Sprite
-	componentUnknown *pixel.Sprite
+	fontAtlas *text.Atlas
+
+	carHoodSprite     *pixel.Sprite
+	componentEmpty    *pixel.Sprite
+	componentMultiply *pixel.Sprite
+	componentAdd      *pixel.Sprite
+	componentUnknown  *pixel.Sprite
 
 	componentSteerLeft  *pixel.Sprite
 	componentSteerRight *pixel.Sprite
@@ -67,6 +73,7 @@ var (
 
 var (
 	hoodScale           float64 = 3
+	worldScale          float64 = 4
 	connectingFromState int
 	connectingFromID    int
 	connectingFromPort  int
@@ -81,12 +88,14 @@ const (
 func run() {
 	cfg := pixelgl.WindowConfig{
 		Title:  "Electronics Jam",
-		Bounds: pixel.R(0, 0, 1024, 768),
+		Bounds: pixel.R(0, 0, 1920, 1080),
 	}
 	win, err := pixelgl.NewWindow(cfg)
 	if err != nil {
 		panic(err)
 	}
+
+	fontAtlas = text.NewAtlas(basicfont.Face7x13, text.ASCII)
 
 	stonePic, err := loadPicture("stone.png")
 	if err != nil {
@@ -111,7 +120,7 @@ func run() {
 		panic(err)
 	}
 	componentEmpty = pixel.NewSprite(componentSpriteSheet, pixel.R(0, 96, 32, 128))
-	//component = pixel.NewSprite(componentSpriteSheet, pixel.R(32, 96, 64, 128))
+	componentMultiply = pixel.NewSprite(componentSpriteSheet, pixel.R(32, 96, 64, 128))
 	componentAdd = pixel.NewSprite(componentSpriteSheet, pixel.R(64, 96, 96, 128))
 	componentUnknown = pixel.NewSprite(componentSpriteSheet, pixel.R(96, 96, 128, 128))
 
@@ -132,24 +141,13 @@ func run() {
 
 	componentSprites = make(map[string]*pixel.Sprite)
 	componentSprites[elcar.CTypeAdd] = componentAdd
+	componentSprites[elcar.CTypeMultiply] = componentMultiply
 	componentSprites[elcar.CTypeRadar] = componentRadar
 
 	car = &elcar.Car{
-		Position: pixel.V(15, 10),
+		Position: pixel.V(15, 120),
 		Rotation: 0,
 		Speed:    15,
-		Components: []elcar.UsedComponent{
-			{
-				ID: elcar.ComponentAny,
-				// ConnectedOutputs: []elcar.ComponentDestination{
-				// 	{
-				// 		ID:   elcar.ComponentSteerLeft,
-				// 		Port: 0,
-				// 	},
-				// },
-				State: &elcar.ConstantValue{},
-			},
-		},
 	}
 
 	componentLocations = []pixel.Vec{
@@ -175,9 +173,29 @@ func run() {
 	for x := 0; x < 7; x++ {
 		for y := 0; y < 2; y++ {
 			componentLocations = append(componentLocations, base.Add(pixel.V(float64(x*32), float64(y*-32))))
-			allowedComponents = append(allowedComponents, []string{elcar.CTypeAdd, elcar.CTypeConstant})
+			allowedComponents = append(allowedComponents, []string{elcar.CTypeAdd, elcar.CTypeMultiply, elcar.CTypeConstant})
 		}
 	}
+
+	objects := &world.Objects{
+		WorldBorder: pixel.R(0, 0, 1920/worldScale, 1080/worldScale),
+		Collidables: []world.Collidable{
+			{
+				Pos:  pixel.V(20, 20),
+				Size: pixel.V(10, 15),
+			},
+			{
+				Pos:  pixel.V(150, 35),
+				Size: pixel.V(2, 2),
+			},
+			{
+				Pos:  pixel.V(300, 100),
+				Size: pixel.V(2, 200),
+			},
+		},
+	}
+
+	imd := imdraw.New(nil)
 
 	hoodOpen := false
 
@@ -190,16 +208,34 @@ func run() {
 			hoodOpen = !hoodOpen
 		}
 
-		car.Update(dt)
+		car.Update(dt, objects)
 
 		win.Clear(colornames.Gainsboro)
-		stoneSprite.Draw(win, pixel.IM.Scaled(pixel.ZV, 10).Moved(win.Bounds().Center()))
 
-		mat := pixel.IM.Scaled(pixel.ZV, 10)
-		mat = mat.Rotated(pixel.ZV, -car.Rotation)
-		mat = mat.Moved(win.Bounds().Center())
+		for _, o := range objects.Collidables {
+			stoneSprite.Draw(win, pixel.IM.Moved(o.Bounds().Center()).Scaled(pixel.ZV, worldScale))
+
+			imd.Clear()
+			imd.Color = colornames.Gray
+			imd.Push(o.Pos.Scaled(worldScale), o.Pos.Add(o.Size).Scaled(worldScale))
+			imd.Rectangle(2)
+			imd.Draw(win)
+		}
+
+		mat := pixel.IM.Rotated(pixel.ZV, -car.Rotation)
 		mat = mat.Moved(car.Position)
+		mat = mat.Scaled(pixel.ZV, worldScale)
 		carSprite.Draw(win, mat)
+
+		for _, debug := range car.DebugPoints {
+			imd.Clear()
+
+			imd.Color = colornames.Magenta
+			imd.EndShape = imdraw.SharpEndShape
+			imd.Push(car.Position.Scaled(worldScale), debug.Scaled(worldScale))
+			imd.Line(5)
+			imd.Draw(win)
+		}
 
 		if hoodOpen {
 			drawHood(win, dt)
@@ -214,6 +250,8 @@ func drawHood(win *pixelgl.Window, dt float64) {
 	carHoodSprite.Draw(win, pixel.IM.Moved(carHoodSprite.Frame().Center()).Scaled(pixel.ZV, hoodScale))
 
 	for idx, location := range componentLocations {
+		component := car.GetComponent(idx)
+
 		var sprite *pixel.Sprite
 		switch idx {
 		case elcar.ComponentSteerLeft:
@@ -226,10 +264,9 @@ func drawHood(win *pixelgl.Window, dt float64) {
 			sprite = componentBrake
 
 		default:
-			compo := car.GetComponent(idx)
-			if compo.State != nil {
+			if component.State != nil {
 				var ok bool
-				sprite, ok = componentSprites[compo.State.GetSpriteName()]
+				sprite, ok = componentSprites[component.State.GetSpriteName()]
 				if !ok {
 					sprite = componentUnknown
 				}
@@ -240,12 +277,20 @@ func drawHood(win *pixelgl.Window, dt float64) {
 			sprite.Draw(win, pixel.IM.Moved(location).Moved(pixel.V(16, 16)).Scaled(pixel.ZV, hoodScale))
 		}
 		drawComponentConnections(win, idx)
+
+		if component.State != nil {
+			debug := component.State.GetDebugState()
+			if debug != "" {
+				basicTxt := text.New(location.Add(pixel.V(16, 0)).Scaled(hoodScale), fontAtlas)
+				fmt.Fprintln(basicTxt, debug)
+				basicTxt.Draw(win, pixel.IM)
+			}
+		}
 	}
 
 	if win.JustReleased(pixelgl.MouseButtonRight) {
 		connectingFromState = NotConnecting
 	}
-
 	mouseJustReleased := win.JustReleased(pixelgl.MouseButtonLeft)
 
 	pos := win.MousePosition()
@@ -258,15 +303,23 @@ func drawHood(win *pixelgl.Window, dt float64) {
 			rect := pixel.R(location.X+10, location.Y+7, location.X+24, location.Y+26)
 			if rect.Contains(pos) {
 
-				componentEmpty.DrawColorMask(win, pixel.IM.Moved(location).Moved(pixel.V(16, 16)).Scaled(pixel.ZV, hoodScale), color.Alpha{A: 40})
+				var tint color.Color
+				if selectingComponent != "" && !isComponentAllowedInSlot(idx, selectingComponent) {
+					tint = color.RGBA{R: 200, A: 40}
+				} else {
+					tint = color.Alpha{A: 40}
+				}
+				componentEmpty.DrawColorMask(win, pixel.IM.Moved(location).Moved(pixel.V(16, 16)).Scaled(pixel.ZV, hoodScale), tint)
 
 				// Change component
 				if mouseJustReleased {
 					if connectingFromState != NotConnecting {
 						connectingFromState = NotConnecting
-					} else if car.GetComponent(idx).State == nil && selectingComponent != "" {
-						car.AddComponent(idx, componentMakerFuncs[selectingComponent]())
-						selectingComponent = ""
+					} else if selectingComponent != "" {
+						if isComponentAllowedInSlot(idx, selectingComponent) {
+							car.AddComponent(idx, componentMakerFuncs[selectingComponent]())
+							selectingComponent = ""
+						}
 					} else {
 						car.RemoveComponent(idx)
 					}
@@ -350,6 +403,7 @@ func drawHood(win *pixelgl.Window, dt float64) {
 var componentList = []string{
 	elcar.CTypeConstant,
 	elcar.CTypeAdd,
+	elcar.CTypeMultiply,
 	elcar.CTypeRadar,
 }
 var selectingComponent string
@@ -360,6 +414,9 @@ var componentMakerFuncs = map[string]func() elcar.Component{
 	},
 	elcar.CTypeAdd: func() elcar.Component {
 		return &elcar.AddComponent{}
+	},
+	elcar.CTypeMultiply: func() elcar.Component {
+		return &elcar.MultiplyComponent{}
 	},
 	elcar.CTypeRadar: func() elcar.Component {
 		return &elcar.ComponentRadar{}
@@ -437,6 +494,19 @@ func getOutPortPosition(port int) pixel.Vec {
 	default:
 		return pixel.ZV
 	}
+}
+
+func isComponentAllowedInSlot(id int, typeName string) bool {
+	if id < 0 || id >= len(allowedComponents) {
+		return false
+	}
+	allowed := allowedComponents[id]
+	for _, s := range allowed {
+		if s == typeName {
+			return true
+		}
+	}
+	return false
 }
 
 func drawComponentConnections(win *pixelgl.Window, id int) {
