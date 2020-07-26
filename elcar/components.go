@@ -52,3 +52,26 @@ func (c *ConstantValue) SetInputs(values []float64) {
 func (c *ConstantValue) GetOutputs() []float64 {
 	return []float64{1}
 }
+
+type ComponentRadar struct {
+}
+
+func (c *ComponentRadar) GetSpriteName() string {
+	return CTypeRadar
+}
+
+func (c *ComponentRadar) Update() {
+}
+
+func (c *ComponentRadar) GetInputCount() int {
+	return 0
+}
+func (c *ComponentRadar) GetOutputCount() int {
+	return 1
+}
+
+func (c *ComponentRadar) SetInputs(values []float64) {
+}
+func (c *ComponentRadar) GetOutputs() []float64 {
+	return []float64{1}
+}

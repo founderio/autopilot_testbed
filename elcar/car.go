@@ -89,7 +89,7 @@ func (c *Car) ConnectPorts(id, port, targetID, targetPort int) {
 }
 
 func (c *Car) Update(dt float64) {
-	dir := pixel.Unit(c.Rotation).Scaled(c.Speed * dt)
+	dir := pixel.Unit(-c.Rotation).Scaled(c.Speed * dt)
 	c.Position = c.Position.Add(dir)
 
 	// Update electronics

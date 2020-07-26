@@ -39,19 +39,26 @@ func loadPicture(filename string) (pixel.Picture, error) {
 }
 
 var (
-	carHoodSprite       *pixel.Sprite
-	componentEmpty      *pixel.Sprite
-	componentRadar      *pixel.Sprite
-	componentAdd        *pixel.Sprite
-	componentUnknown    *pixel.Sprite
+	carHoodSprite  *pixel.Sprite
+	componentEmpty *pixel.Sprite
+	//componentRadar      *pixel.Sprite
+	componentAdd     *pixel.Sprite
+	componentUnknown *pixel.Sprite
+
 	componentSteerLeft  *pixel.Sprite
 	componentSteerRight *pixel.Sprite
 	componentAccelerate *pixel.Sprite
 	componentBrake      *pixel.Sprite
 
+	componentRadar *pixel.Sprite
+	// componentSteerRight *pixel.Sprite
+	// componentAccelerate *pixel.Sprite
+	// componentBrake      *pixel.Sprite
+
 	componentSprites map[string]*pixel.Sprite
 
 	componentLocations []pixel.Vec
+	allowedComponents  [][]string
 )
 
 var (
@@ -104,7 +111,7 @@ func run() {
 		panic(err)
 	}
 	componentEmpty = pixel.NewSprite(componentSpriteSheet, pixel.R(0, 96, 32, 128))
-	componentRadar = pixel.NewSprite(componentSpriteSheet, pixel.R(32, 96, 64, 128))
+	//component = pixel.NewSprite(componentSpriteSheet, pixel.R(32, 96, 64, 128))
 	componentAdd = pixel.NewSprite(componentSpriteSheet, pixel.R(64, 96, 96, 128))
 	componentUnknown = pixel.NewSprite(componentSpriteSheet, pixel.R(96, 96, 128, 128))
 
@@ -112,6 +119,16 @@ func run() {
 	componentSteerRight = pixel.NewSprite(componentSpriteSheet, pixel.R(32, 64, 64, 96))
 	componentAccelerate = pixel.NewSprite(componentSpriteSheet, pixel.R(64, 64, 96, 96))
 	componentBrake = pixel.NewSprite(componentSpriteSheet, pixel.R(96, 64, 128, 96))
+
+	componentRadar = pixel.NewSprite(componentSpriteSheet, pixel.R(0, 32, 32, 64))
+	//component = pixel.NewSprite(componentSpriteSheet, pixel.R(32, 32, 64, 64))
+	//component = pixel.NewSprite(componentSpriteSheet, pixel.R(64, 32, 96, 64))
+	//component = pixel.NewSprite(componentSpriteSheet, pixel.R(96, 32, 128, 64))
+
+	//component = pixel.NewSprite(componentSpriteSheet, pixel.R(0, 0, 32, 32))
+	//component = pixel.NewSprite(componentSpriteSheet, pixel.R(32, 0, 64, 32))
+	//component = pixel.NewSprite(componentSpriteSheet, pixel.R(64, 0, 96, 32))
+	//component = pixel.NewSprite(componentSpriteSheet, pixel.R(96, 0, 128, 32))
 
 	componentSprites = make(map[string]*pixel.Sprite)
 	componentSprites[elcar.CTypeAdd] = componentAdd
@@ -141,10 +158,24 @@ func run() {
 		pixel.V(138, 256-44), // ComponentAccelerate
 		pixel.V(199, 256-44), // ComponentBrake
 	}
-	base := pixel.V(9, 256-85) // ComponentAny ff
+	allowedComponents = [][]string{
+		{}, // ComponentSteerLeft
+		{}, // ComponentSteerRight
+		{}, // ComponentAccelerate
+		{}, // ComponentBrake
+	}
+	// ComponentAny, front-facing sensor mounts
+
+	componentLocations = append(componentLocations, pixel.V(55, 256-25))
+	componentLocations = append(componentLocations, pixel.V(169, 256-25))
+	allowedComponents = append(allowedComponents, []string{elcar.CTypeRadar})
+	allowedComponents = append(allowedComponents, []string{elcar.CTypeRadar})
+
+	base := pixel.V(9, 256-85) // ComponentAny, internal chip mounts
 	for x := 0; x < 7; x++ {
 		for y := 0; y < 2; y++ {
 			componentLocations = append(componentLocations, base.Add(pixel.V(float64(x*32), float64(y*-32))))
+			allowedComponents = append(allowedComponents, []string{elcar.CTypeAdd, elcar.CTypeConstant})
 		}
 	}
 
@@ -172,6 +203,7 @@ func run() {
 
 		if hoodOpen {
 			drawHood(win, dt)
+			drawComponentSelector(win, dt)
 		}
 
 		win.Update()
@@ -223,7 +255,7 @@ func drawHood(win *pixelgl.Window, dt float64) {
 	for idx, location := range componentLocations {
 		if idx >= elcar.ComponentAny {
 
-			rect := pixel.R(location.X+10, location.Y+7, location.X+23, location.Y+23)
+			rect := pixel.R(location.X+10, location.Y+7, location.X+24, location.Y+26)
 			if rect.Contains(pos) {
 
 				componentEmpty.DrawColorMask(win, pixel.IM.Moved(location).Moved(pixel.V(16, 16)).Scaled(pixel.ZV, hoodScale), color.Alpha{A: 40})
@@ -232,8 +264,9 @@ func drawHood(win *pixelgl.Window, dt float64) {
 				if mouseJustReleased {
 					if connectingFromState != NotConnecting {
 						connectingFromState = NotConnecting
-					} else if car.GetComponent(idx).State == nil {
-						car.AddComponent(idx, &elcar.AddComponent{})
+					} else if car.GetComponent(idx).State == nil && selectingComponent != "" {
+						car.AddComponent(idx, componentMakerFuncs[selectingComponent]())
+						selectingComponent = ""
 					} else {
 						car.RemoveComponent(idx)
 					}
@@ -311,6 +344,63 @@ func drawHood(win *pixelgl.Window, dt float64) {
 				imd.Draw(win)
 			}
 		}
+	}
+}
+
+var componentList = []string{
+	elcar.CTypeConstant,
+	elcar.CTypeAdd,
+	elcar.CTypeRadar,
+}
+var selectingComponent string
+
+var componentMakerFuncs = map[string]func() elcar.Component{
+	elcar.CTypeConstant: func() elcar.Component {
+		return &elcar.ConstantValue{}
+	},
+	elcar.CTypeAdd: func() elcar.Component {
+		return &elcar.AddComponent{}
+	},
+	elcar.CTypeRadar: func() elcar.Component {
+		return &elcar.ComponentRadar{}
+	},
+}
+
+func drawComponentSelector(win *pixelgl.Window, dt float64) {
+	basePos := pixel.V(270, 160)
+
+	for i, typeName := range componentList {
+		singlePos := pixel.V(float64((i%2)*32), float64((i/-2)*32))
+
+		sprite := componentSprites[typeName]
+		if sprite == nil {
+			sprite = componentUnknown
+		}
+		sprite.Draw(win, pixel.IM.Moved(basePos).Moved(singlePos).Moved(pixel.V(16, 16)).Scaled(pixel.ZV, hoodScale))
+
+		rect := pixel.R(singlePos.X+basePos.X+10, singlePos.Y+basePos.Y+7, singlePos.X+basePos.X+24, singlePos.Y+basePos.Y+26)
+
+		if rect.Contains(win.MousePosition().Scaled(1 / hoodScale)) {
+
+			componentEmpty.DrawColorMask(win, pixel.IM.Moved(basePos).Moved(singlePos).Moved(pixel.V(16, 16)).Scaled(pixel.ZV, hoodScale), color.Alpha{A: 40})
+
+			// Change selected component
+			if win.JustPressed(pixelgl.MouseButtonLeft) {
+				selectingComponent = typeName
+			}
+		}
+	}
+
+	if win.JustPressed(pixelgl.MouseButtonRight) {
+		selectingComponent = ""
+	}
+
+	if selectingComponent != "" {
+		sprite := componentSprites[selectingComponent]
+		if sprite == nil {
+			sprite = componentUnknown
+		}
+		sprite.Draw(win, pixel.IM.Scaled(pixel.ZV, hoodScale).Moved(win.MousePosition()).Moved(pixel.V(16, -16).Scaled(hoodScale)))
 	}
 }
 
