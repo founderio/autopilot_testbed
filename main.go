@@ -13,6 +13,7 @@ import (
 	_ "image/png"
 
 	"founderio.net/eljam/elcar"
+	"founderio.net/eljam/paths"
 	"founderio.net/eljam/world"
 	"github.com/BurntSushi/toml"
 	"github.com/faiface/pixel"
@@ -76,12 +77,24 @@ var (
 	connectingFromPort  int
 
 	selectingComponent string
+
+	dragRectStartPoint pixel.Vec
+
+	menu = MenuClosed
 )
 
 const (
 	NotConnecting int = iota
 	ConnectingFromInput
 	ConnectingFromOutput
+)
+
+const (
+	MenuClosed int = iota
+	MenuHood
+	MenuMain
+	MenuSave
+	MenuLoad
 )
 
 func run() {
@@ -198,15 +211,33 @@ func run() {
 
 	imd := imdraw.New(nil)
 
-	hoodOpen := false
-
 	last := time.Now()
 	for !win.Closed() {
 		dt := time.Since(last).Seconds()
 		last = time.Now()
 
 		if win.JustPressed(pixelgl.KeyTab) {
-			hoodOpen = !hoodOpen
+			if menu == MenuClosed {
+				menu = MenuHood
+			} else if menu == MenuHood {
+				menu = MenuClosed
+			}
+		}
+		if win.JustPressed(pixelgl.KeyEscape) {
+			switch menu {
+			case MenuLoad:
+				fallthrough
+			case MenuSave:
+				fallthrough
+			case MenuClosed:
+				menu = MenuMain
+
+			case MenuMain:
+				fallthrough
+			case MenuHood:
+				menu = MenuClosed
+
+			}
 		}
 
 		car.Update(dt, world)
@@ -248,26 +279,208 @@ func run() {
 			imd.Draw(win)
 		}
 
-		if hoodOpen {
+		switch menu {
+		case MenuClosed:
+			runLevelEditTools(win, dt)
+
+		case MenuHood:
 			drawHood(win, dt)
 			drawComponentSelector(win, dt)
-		} else {
-			if win.JustPressed(pixelgl.MouseButtonLeft) {
-				dragRectStartPoint = win.MousePosition().Scaled(1 / worldScale)
-			}
-			if win.JustReleased(pixelgl.MouseButtonLeft) {
-				dragRectEndPoint := win.MousePosition().Scaled(1 / worldScale)
-				rect := pixel.R(dragRectStartPoint.X, dragRectStartPoint.Y, dragRectEndPoint.X, dragRectEndPoint.Y)
-				fmt.Printf("[[Collidables]]\nPos = { X = %4.2f, Y = %4.2f }\nSize = { X = %4.2f, Y = %4.2f }\n",
-					rect.Min.X, rect.Min.Y, rect.Size().X, rect.Size().Y)
-			}
+
+		case MenuMain:
+			drawMainMenu(win, dt)
+
+		case MenuLoad:
+			drawLoadMenu(win, dt)
+
+		case MenuSave:
+			drawSaveMenu(win, dt)
 		}
 
 		win.Update()
 	}
 }
 
-var dragRectStartPoint pixel.Vec
+func rectAround(center, size pixel.Vec) pixel.Rect {
+	half := size.Scaled(0.5)
+	return pixel.Rect{
+		Min: center.Sub(half),
+		Max: center.Add(half),
+	}
+}
+
+func drawMainMenu(win *pixelgl.Window, dt float64) {
+	buttonSize := pixel.V(250, 50)
+
+	if drawMenuButton(win, fontAtlas, "Save Car", rectAround(win.Bounds().Center().Add(pixel.V(0, 150)), buttonSize)) {
+		menu = MenuSave
+		loadSaveEntries()
+	}
+	if drawMenuButton(win, fontAtlas, "Load Car", rectAround(win.Bounds().Center().Add(pixel.V(0, 50)), buttonSize)) {
+		menu = MenuLoad
+		loadSaveEntries()
+	}
+	if drawMenuButton(win, fontAtlas, "Exit", rectAround(win.Bounds().Center().Add(pixel.V(0, -150)), buttonSize)) {
+		win.SetClosed(true)
+	}
+}
+
+func drawLoadMenu(win *pixelgl.Window, dt float64) {
+	buttonSize := pixel.V(250, 50)
+
+	drawMenuButton(win, fontAtlas, "Load Car", rectAround(win.Bounds().Center().Add(pixel.V(0, 150)), buttonSize))
+	if drawMenuButton(win, fontAtlas, "<", rectAround(win.Bounds().Center().Add(pixel.V(-150, 150)), pixel.V(50, 50))) {
+		menu = MenuMain
+	}
+
+	if saveLoadError != "" {
+		drawError(win, fontAtlas, saveLoadError, win.Bounds().Center().Add(pixel.V(0, 220)))
+	}
+
+	for i, entry := range saveEntries {
+		buttonRect := rectAround(win.Bounds().Center().Add(pixel.V(0, float64(50-i*100))), buttonSize)
+		var buttonText string
+		if entry.Used {
+			buttonText = "blah date here"
+		} else {
+			buttonText = "[Empty]"
+		}
+
+		if drawMenuButton(win, fontAtlas, buttonText, buttonRect) {
+			err := loadCar(i)
+			if err == nil {
+				saveLoadError = ""
+				menu = MenuHood
+			} else {
+				saveLoadError = err.Error()
+			}
+		}
+	}
+}
+
+func drawSaveMenu(win *pixelgl.Window, dt float64) {
+	buttonSize := pixel.V(250, 50)
+
+	drawMenuButton(win, fontAtlas, "Save Car", rectAround(win.Bounds().Center().Add(pixel.V(0, 150)), buttonSize))
+	if drawMenuButton(win, fontAtlas, "<", rectAround(win.Bounds().Center().Add(pixel.V(-150, 150)), pixel.V(50, 50))) {
+		menu = MenuMain
+	}
+
+	if saveLoadError != "" {
+		drawError(win, fontAtlas, saveLoadError, win.Bounds().Center().Add(pixel.V(0, 220)))
+	}
+
+	for i, entry := range saveEntries {
+		buttonRect := rectAround(win.Bounds().Center().Add(pixel.V(0, float64(50-i*100))), buttonSize)
+		var buttonText string
+		if entry.Used {
+			buttonText = "blah date here"
+		} else {
+			buttonText = "[Empty]"
+		}
+
+		if drawMenuButton(win, fontAtlas, buttonText, buttonRect) {
+			err := saveCar(i)
+			if err == nil {
+				loadSaveEntries()
+				saveLoadError = ""
+			} else {
+				saveLoadError = err.Error()
+			}
+		}
+	}
+}
+
+func loadCar(slot int) error {
+	filename := getSaveFileName(slot)
+	return car.Load(filename)
+}
+
+func saveCar(slot int) error {
+	filename := getSaveFileName(slot)
+	return car.Save(filename)
+}
+
+var saveEntries [5]SaveEntry
+var saveLoadError string
+
+type SaveEntry struct {
+	Used    bool
+	Created time.Time
+}
+
+func getSaveFileName(slot int) string {
+	return filepath.Join(paths.GetDataPath(), fmt.Sprintf("save_%d.toml", slot))
+}
+
+func loadSaveEntries() {
+	saveLoadError = ""
+	for i := range saveEntries {
+		filename := getSaveFileName(i)
+
+		info, err := os.Stat(filename)
+		if err == nil && !info.IsDir() {
+			saveEntries[i] = SaveEntry{
+				Used:    true,
+				Created: info.ModTime(),
+			}
+		} else {
+			saveEntries[i] = SaveEntry{}
+		}
+	}
+}
+
+func drawError(win *pixelgl.Window, atlas *text.Atlas, errorText string, location pixel.Vec) {
+	textScale := float64(1.5)
+
+	textDraw := text.New(location, atlas)
+	textDraw.Color = colornames.Red
+	textDraw.Dot.X -= textDraw.BoundsOf(errorText).W() / 2
+	textDraw.Dot.Y -= textDraw.LineHeight / textScale
+	textDraw.WriteString(errorText)
+	textDraw.Draw(win, pixel.IM.Scaled(location, textScale))
+}
+
+func drawMenuButton(win *pixelgl.Window, atlas *text.Atlas, buttonText string, bounds pixel.Rect) bool {
+	textScale := float64(3)
+
+	imd := imdraw.New(nil)
+
+	imd.Color = colornames.Black
+	imd.EndShape = imdraw.RoundEndShape
+	imd.Push(bounds.Min, bounds.Max)
+	imd.Rectangle(4)
+	imd.Draw(win)
+
+	textDraw := text.New(bounds.Center(), atlas)
+	textDraw.Color = colornames.Black
+	textDraw.Dot.X -= textDraw.BoundsOf(buttonText).W() / 2
+	textDraw.Dot.Y -= textDraw.LineHeight / textScale
+	textDraw.WriteString(buttonText)
+	textDraw.Draw(win, pixel.IM.Scaled(bounds.Center(), textScale))
+
+	return win.JustReleased(pixelgl.MouseButtonLeft) &&
+		bounds.Contains(win.MousePosition())
+}
+
+func drawButton(win *pixelgl.Window, sprite *pixel.Sprite, bounds pixel.Rect, scale pixel.Vec) bool {
+	sprite.Draw(win, pixel.IM.ScaledXY(pixel.ZV, scale).Moved(bounds.Center()))
+
+	return win.JustReleased(pixelgl.MouseButtonLeft) &&
+		bounds.Contains(win.MousePosition())
+}
+
+func runLevelEditTools(win *pixelgl.Window, dt float64) {
+	if win.JustPressed(pixelgl.MouseButtonLeft) {
+		dragRectStartPoint = win.MousePosition().Scaled(1 / worldScale)
+	}
+	if win.JustReleased(pixelgl.MouseButtonLeft) {
+		dragRectEndPoint := win.MousePosition().Scaled(1 / worldScale)
+		rect := pixel.R(dragRectStartPoint.X, dragRectStartPoint.Y, dragRectEndPoint.X, dragRectEndPoint.Y)
+		fmt.Printf("[[Collidables]]\nPos = { X = %4.2f, Y = %4.2f }\nSize = { X = %4.2f, Y = %4.2f }\n",
+			rect.Min.X, rect.Min.Y, rect.Size().X, rect.Size().Y)
+	}
+}
 
 func drawHood(win *pixelgl.Window, dt float64) {
 	carHoodSprite.Draw(win, pixel.IM.Moved(carHoodSprite.Frame().Center()).Scaled(pixel.ZV, hoodScale))
