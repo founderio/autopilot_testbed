@@ -341,7 +341,7 @@ func drawLoadMenu(win *pixelgl.Window, dt float64) {
 		buttonRect := rectAround(win.Bounds().Center().Add(pixel.V(0, float64(50-i*100))), buttonSize)
 		var buttonText string
 		if entry.Used {
-			buttonText = "blah date here"
+			buttonText = entry.Created.Format("2006-01-02 15:04:05")
 		} else {
 			buttonText = "[Empty]"
 		}
@@ -374,7 +374,7 @@ func drawSaveMenu(win *pixelgl.Window, dt float64) {
 		buttonRect := rectAround(win.Bounds().Center().Add(pixel.V(0, float64(50-i*100))), buttonSize)
 		var buttonText string
 		if entry.Used {
-			buttonText = "blah date here"
+			buttonText = entry.Created.Format("2006-01-02 15:04:05")
 		} else {
 			buttonText = "[Empty]"
 		}
@@ -573,7 +573,7 @@ func drawHood(win *pixelgl.Window, dt float64) {
 			if rect.Contains(pos) {
 
 				var tint color.Color
-				if selectingComponent != "" && !isComponentAllowedInSlot(idx, selectingComponent) {
+				if selectingComponent != "" && !elcar.IsComponentAllowedInSlot(idx, selectingComponent) {
 					tint = color.RGBA{R: 200, A: 40}
 				} else {
 					tint = color.Alpha{A: 40}
@@ -585,7 +585,7 @@ func drawHood(win *pixelgl.Window, dt float64) {
 					if connectingFromState != NotConnecting {
 						connectingFromState = NotConnecting
 					} else if selectingComponent != "" {
-						if isComponentAllowedInSlot(idx, selectingComponent) {
+						if elcar.IsComponentAllowedInSlot(idx, selectingComponent) {
 							car.AddComponent(idx, selectingComponent)
 							selectingComponent = ""
 						}
@@ -730,31 +730,6 @@ func getInPinPosition(typeName string, port int) pixel.Vec {
 	return def.InputPins[port].Position
 }
 
-func getOutPinPosition(typeName string, port int) pixel.Vec {
-	def, ok := elcar.Definitions.Components[typeName]
-	if !ok {
-		return pixel.ZV
-	}
-
-	if port < 0 || port >= len(def.OutputPins) {
-		return pixel.ZV
-	}
-
-	return def.OutputPins[port].Position
-}
-
-func isComponentAllowedInSlot(id int, typeName string) bool {
-	if id < 0 || id >= len(elcar.Definitions.Ports) {
-		return false
-	}
-	portDef := elcar.Definitions.Ports[id]
-	componentDef, ok := elcar.Definitions.Components[typeName]
-	if !ok {
-		return false
-	}
-	return portDef.PortKind == componentDef.PortKind
-}
-
 func drawComponentConnections(win *pixelgl.Window, id int) {
 	comp := car.GetComponent(id)
 	if len(comp.ConnectedOutputs) == 0 {
@@ -777,7 +752,7 @@ func drawComponentConnections(win *pixelgl.Window, id int) {
 			continue
 		}
 
-		pinOffsetOut := getOutPinPosition(comp.TypeName, outPin)
+		pinOffsetOut := elcar.GetOutPinPosition(comp.TypeName, outPin)
 
 		targetPos := elcar.Definitions.Ports[conn.ID].HoodPosition
 

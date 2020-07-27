@@ -322,36 +322,3 @@ type Component interface {
 	SetInputs(values []float64, connected []bool)
 	GetOutputs() []float64
 }
-
-type Defs struct {
-	Components map[string]ComponentDefinition
-	Ports      []PortDefinition
-}
-
-type PortKind string
-
-const (
-	PortKindSensor  PortKind = "sensor"
-	PortKindChip    PortKind = "chip"
-	PortKindBuiltin PortKind = "builtin"
-)
-
-type PortDefinition struct {
-	HoodPosition  pixel.Vec
-	WorldPosition pixel.Vec
-	Direction     pixel.Vec
-
-	PortKind PortKind
-	Prefill  string
-}
-
-type ComponentDefinition struct {
-	Usable     bool
-	PortKind   PortKind
-	InputPins  []PinDefinition
-	OutputPins []PinDefinition
-}
-
-type PinDefinition struct {
-	Position pixel.Vec
-}
