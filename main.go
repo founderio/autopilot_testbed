@@ -308,6 +308,9 @@ func run() {
 			if drawMenuButton(win, fontAtlas, "Open Hood [Tab]", pixel.R(0, 0, 350, 50)) {
 				menu = MenuHood
 			}
+			if drawMenuButton(win, fontAtlas, "Menu [Esc]", pixel.R(0, win.Bounds().H()-50, 350, win.Bounds().H())) {
+				menu = MenuMain
+			}
 
 		case MenuHood:
 			drawHood(win, dt)
@@ -340,6 +343,10 @@ func rectAround(center, size pixel.Vec) pixel.Rect {
 
 func drawMainMenu(win *pixelgl.Window, dt float64) {
 	buttonSize := pixel.V(450, 50)
+
+	if drawMenuButton(win, fontAtlas, "Continue", rectAround(win.Bounds().Center().Add(pixel.V(0, 250)), buttonSize)) {
+		menu = MenuClosed
+	}
 
 	if drawMenuButton(win, fontAtlas, "Save Car", rectAround(win.Bounds().Center().Add(pixel.V(0, 150)), buttonSize)) {
 		menu = MenuSave
