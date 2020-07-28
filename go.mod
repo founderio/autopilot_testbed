@@ -1,4 +1,4 @@
-module founderio.net/autopilot_testbed
+module github.com/founderio/autopilot_testbed
 
 go 1.14
 

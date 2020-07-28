@@ -1,6 +1,8 @@
-# Autopilot Testbed
+# [Autopilot Testbed](https://founderio.itch.io/autopilot-testbed)
 
-https://founderio.itch.io/autopilot-testbed
+You are tasked with designing the brain of the next generation of autopilots for personal cars.
+
+Your tools? Simulated analog electronics. Make do with what you have and.. try to stay on the road at least.
 
 ## Requirements
 This game requires OpenGL 3.3+ to run.
