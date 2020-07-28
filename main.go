@@ -85,6 +85,14 @@ var (
 	dragRectStartPoint pixel.Vec
 
 	menu = MenuClosed
+
+	overlays = OverlaysAll
+)
+
+const (
+	OverlaysNone int = iota
+	OverlaysSensors
+	OverlaysAll
 )
 
 const (
@@ -234,6 +242,9 @@ func run() {
 		if menu == MenuClosed && win.JustPressed(pixelgl.KeyR) {
 			resetCarPosition()
 		}
+		if menu == MenuClosed && win.JustPressed(pixelgl.KeyT) {
+			toggleOverlays()
+		}
 		if win.JustPressed(pixelgl.KeyEscape) {
 			switch menu {
 			case MenuLoad:
@@ -260,12 +271,14 @@ func run() {
 		worldSprite.Draw(win, pixel.IM.Scaled(pixel.ZV, world.Scale).Moved(win.Bounds().Center()))
 
 		// World Walls
-		for _, o := range world.Walls {
-			imd.Clear()
-			imd.Color = colornames.Gray
-			imd.Push(o.Pos.Scaled(world.Scale), o.Pos.Add(o.Size).Scaled(world.Scale))
-			imd.Rectangle(2)
-			imd.Draw(win)
+		if overlays == OverlaysAll {
+			for _, o := range world.Walls {
+				imd.Clear()
+				imd.Color = colornames.Gray
+				imd.Push(o.Pos.Scaled(world.Scale), o.Pos.Add(o.Size).Scaled(world.Scale))
+				imd.Rectangle(2)
+				imd.Draw(win)
+			}
 		}
 
 		// Props
@@ -277,11 +290,13 @@ func run() {
 
 			sprite.Draw(win, pixel.IM.Moved(sprite.Frame().Size().Scaled(0.5)).Moved(o.Pos).Scaled(pixel.ZV, world.Scale))
 
-			imd.Clear()
-			imd.Color = colornames.Lightblue
-			imd.Push(o.Pos.Scaled(world.Scale), o.Pos.Add(sprite.Frame().Size()).Scaled(world.Scale))
-			imd.Rectangle(2)
-			imd.Draw(win)
+			if overlays == OverlaysAll {
+				imd.Clear()
+				imd.Color = colornames.Lightblue
+				imd.Push(o.Pos.Scaled(world.Scale), o.Pos.Add(sprite.Frame().Size()).Scaled(world.Scale))
+				imd.Rectangle(2)
+				imd.Draw(win)
+			}
 		}
 
 		mat := pixel.IM.Rotated(pixel.ZV, -car.Rotation)
@@ -289,24 +304,26 @@ func run() {
 		mat = mat.Scaled(pixel.ZV, world.Scale)
 		carSprite.Draw(win, mat)
 
-		for _, debug := range car.DebugPoints {
-			imd.Clear()
+		if overlays >= OverlaysSensors {
+			for _, debug := range car.DebugPoints {
+				imd.Clear()
 
-			imd.Color = colornames.Magenta
-			imd.EndShape = imdraw.SharpEndShape
-			imd.Push(car.Position.Scaled(world.Scale), debug.Scaled(world.Scale))
-			imd.Line(1)
-			imd.Draw(win)
-		}
+				imd.Color = colornames.Magenta
+				imd.EndShape = imdraw.SharpEndShape
+				imd.Push(car.Position.Scaled(world.Scale), debug.Scaled(world.Scale))
+				imd.Line(1)
+				imd.Draw(win)
+			}
 
-		for _, debug := range car.DebugLines {
-			imd.Clear()
+			for _, debug := range car.DebugLines {
+				imd.Clear()
 
-			imd.Color = colornames.Magenta
-			imd.EndShape = imdraw.SharpEndShape
-			imd.Push(debug.A.Scaled(world.Scale), debug.B.Scaled(world.Scale))
-			imd.Line(1)
-			imd.Draw(win)
+				imd.Color = colornames.Magenta
+				imd.EndShape = imdraw.SharpEndShape
+				imd.Push(debug.A.Scaled(world.Scale), debug.B.Scaled(world.Scale))
+				imd.Line(1)
+				imd.Draw(win)
+			}
 		}
 
 		switch menu {
@@ -317,6 +334,9 @@ func run() {
 			}
 			if drawMenuButton(win, fontAtlas, "Reset Car Position [R]", pixel.R(350, 0, 350+500, 50)) {
 				resetCarPosition()
+			}
+			if drawMenuButton(win, fontAtlas, "Toggle Overlays [T]", pixel.R(350+500, 0, 350+500+450, 50)) {
+				toggleOverlays()
 			}
 			if drawMenuButton(win, fontAtlas, "Menu [Esc]", pixel.R(0, win.Bounds().H()-50, 350, win.Bounds().H())) {
 				menu = MenuMain
@@ -356,6 +376,13 @@ func resetCarPosition() {
 	car.Braking = 0
 
 	car.ResetComponentState()
+}
+
+func toggleOverlays() {
+	overlays++
+	if overlays > OverlaysAll {
+		overlays = OverlaysNone
+	}
 }
 
 func rectAround(center, size pixel.Vec) pixel.Rect {
