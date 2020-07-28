@@ -5,7 +5,6 @@ import (
 	"math"
 	"strconv"
 
-	"founderio.net/eljam/world"
 	"github.com/faiface/pixel"
 )
 
@@ -13,7 +12,7 @@ type BuiltinSteering struct {
 	steerLeft, steerRight float64
 }
 
-func (c *BuiltinSteering) Update(car *Car, objects *world.Objects, port PortDefinition) {
+func (c *BuiltinSteering) Update(car *Car, background pixel.PictureColor, world *World, port PortDefinition) {
 	car.Steering = c.steerRight - c.steerLeft
 }
 func (c *BuiltinSteering) GetDebugState() string {
@@ -31,7 +30,7 @@ type BuiltinAcceleration struct {
 	acceleration float64
 }
 
-func (c *BuiltinAcceleration) Update(car *Car, objects *world.Objects, port PortDefinition) {
+func (c *BuiltinAcceleration) Update(car *Car, background pixel.PictureColor, world *World, port PortDefinition) {
 	car.Acceleration = c.acceleration
 }
 func (c *BuiltinAcceleration) GetDebugState() string {
@@ -49,7 +48,7 @@ type BuiltinBraking struct {
 	braking float64
 }
 
-func (c *BuiltinBraking) Update(car *Car, objects *world.Objects, port PortDefinition) {
+func (c *BuiltinBraking) Update(car *Car, background pixel.PictureColor, world *World, port PortDefinition) {
 	car.Braking = c.braking
 }
 func (c *BuiltinBraking) GetDebugState() string {
@@ -68,7 +67,7 @@ type CompareEquals struct {
 	value float64
 }
 
-func (c *CompareEquals) Update(car *Car, objects *world.Objects, port PortDefinition) {
+func (c *CompareEquals) Update(car *Car, background pixel.PictureColor, world *World, port PortDefinition) {
 	absDiff := math.Abs(c.a - c.b)
 	if absDiff < 0.5 {
 		c.value = (0.5 - absDiff) * 2
@@ -92,7 +91,7 @@ type Subtract struct {
 	value float64
 }
 
-func (c *Subtract) Update(car *Car, objects *world.Objects, port PortDefinition) {
+func (c *Subtract) Update(car *Car, background pixel.PictureColor, world *World, port PortDefinition) {
 	c.value = c.a - c.b
 }
 func (c *Subtract) GetDebugState() string {
@@ -111,7 +110,7 @@ type Add struct {
 	value  float64
 }
 
-func (c *Add) Update(car *Car, objects *world.Objects, port PortDefinition) {
+func (c *Add) Update(car *Car, background pixel.PictureColor, world *World, port PortDefinition) {
 	var newValue float64
 	for _, val := range c.inputs {
 		newValue += val
@@ -135,7 +134,7 @@ type Multiply struct {
 	value     float64
 }
 
-func (c *Multiply) Update(car *Car, objects *world.Objects, port PortDefinition) {
+func (c *Multiply) Update(car *Car, background pixel.PictureColor, world *World, port PortDefinition) {
 	var newValue float64 = 1
 	for i, val := range c.inputs {
 		if c.connected[i] {
@@ -160,16 +159,16 @@ type ConstantValue struct {
 }
 
 func (c *ConstantValue) GetDebugState() string {
-	return strconv.FormatFloat(1, 'g', 3, 64)
+	return "0.5, 1.0, 2.0"
 }
 
-func (c *ConstantValue) Update(car *Car, objects *world.Objects, port PortDefinition) {
+func (c *ConstantValue) Update(car *Car, background pixel.PictureColor, world *World, port PortDefinition) {
 }
 
 func (c *ConstantValue) SetInputs(values []float64, connected []bool) {
 }
 func (c *ConstantValue) GetOutputs() []float64 {
-	return []float64{1, 1, 1}
+	return []float64{0.5, 1.0, 2.0}
 }
 
 type SplitSignal struct {
@@ -180,7 +179,7 @@ func (c *SplitSignal) GetDebugState() string {
 	return strconv.FormatFloat(c.input, 'g', 3, 64)
 }
 
-func (c *SplitSignal) Update(car *Car, objects *world.Objects, port PortDefinition) {
+func (c *SplitSignal) Update(car *Car, background pixel.PictureColor, world *World, port PortDefinition) {
 }
 
 func (c *SplitSignal) SetInputs(values []float64, connected []bool) {
@@ -190,11 +189,11 @@ func (c *SplitSignal) GetOutputs() []float64 {
 	return []float64{c.input, c.input, c.input}
 }
 
-func castLine(objects *world.Objects, line pixel.Line, maxDistance float64) (float64, pixel.Vec) {
+func castLine(world *World, line pixel.Line, maxDistance float64) (float64, pixel.Vec) {
 	closestPoint := line.B
 	closestDistance := maxDistance
 
-	intersections := objects.WorldBorder.IntersectionPoints(line)
+	intersections := world.Bounds().IntersectionPoints(line)
 	for _, intersectionPoint := range intersections {
 		dist := absDistance(intersectionPoint, line.A)
 		if dist < closestDistance {
@@ -203,8 +202,24 @@ func castLine(objects *world.Objects, line pixel.Line, maxDistance float64) (flo
 		}
 	}
 
-	for _, o := range objects.Collidables {
+	for _, o := range world.Walls {
 		intersections := o.Bounds().IntersectionPoints(line)
+		for _, intersectionPoint := range intersections {
+			dist := absDistance(intersectionPoint, line.A)
+			if dist < closestDistance {
+				closestDistance = dist
+				closestPoint = intersectionPoint
+			}
+		}
+	}
+
+	for _, o := range world.Props {
+		def, ok := SpriteDefinitions.Props[o.Name]
+		if !ok {
+			continue
+		}
+
+		intersections := o.Bounds(def).IntersectionPoints(line)
 		for _, intersectionPoint := range intersections {
 			dist := absDistance(intersectionPoint, line.A)
 			if dist < closestDistance {
@@ -217,11 +232,11 @@ func castLine(objects *world.Objects, line pixel.Line, maxDistance float64) (flo
 	return closestDistance, closestPoint
 }
 
-func castCircle(objects *world.Objects, circle pixel.Circle, direction pixel.Vec, maxDistance float64) (float64, pixel.Vec) {
+func castCircle(world *World, circle pixel.Circle, direction pixel.Vec, maxDistance float64) (float64, pixel.Vec) {
 	closestDistance := maxDistance
 	closestPoint := circle.Center.Add(direction.Scaled(maxDistance))
 
-	for _, line := range objects.WorldBorder.Edges() {
+	for _, line := range world.Bounds().Edges() {
 		intersects := circle.IntersectLine(line)
 		if intersects != pixel.ZV {
 			intersectionPoint := line.Closest(circle.Center)
@@ -234,8 +249,28 @@ func castCircle(objects *world.Objects, circle pixel.Circle, direction pixel.Vec
 		}
 	}
 
-	for _, o := range objects.Collidables {
+	for _, o := range world.Walls {
 		for _, line := range o.Bounds().Edges() {
+			intersects := circle.IntersectLine(line)
+			if intersects != pixel.ZV {
+				intersectionPoint := line.Closest(circle.Center)
+
+				dist := absDistance(intersectionPoint, circle.Center)
+				if dist < closestDistance {
+					closestDistance = dist
+					closestPoint = intersectionPoint
+				}
+			}
+		}
+	}
+
+	for _, o := range world.Props {
+		def, ok := SpriteDefinitions.Props[o.Name]
+		if !ok {
+			continue
+		}
+
+		for _, line := range o.Bounds(def).Edges() {
 			intersects := circle.IntersectLine(line)
 			if intersects != pixel.ZV {
 				intersectionPoint := line.Closest(circle.Center)
@@ -260,7 +295,7 @@ func (c *Radar) GetDebugState() string {
 	return strconv.FormatFloat(c.value, 'g', 3, 64)
 }
 
-func (c *Radar) Update(car *Car, objects *world.Objects, port PortDefinition) {
+func (c *Radar) Update(car *Car, background pixel.PictureColor, world *World, port PortDefinition) {
 	beamLength := float64(50)
 	shortBeamLength := float64(10)
 	beamStart := port.WorldPosition.Rotated(-car.Rotation).Add(car.Position)
@@ -274,10 +309,10 @@ func (c *Radar) Update(car *Car, objects *world.Objects, port PortDefinition) {
 	}
 
 	// Long-distance check, linecast
-	closestDistance, closestPoint := castLine(objects, checkLine, beamLength)
+	closestDistance, closestPoint := castLine(world, checkLine, beamLength)
 
 	// Check in circle directly around the sensor
-	circleDistance, circlePoint := castCircle(objects, beamCircle, beamDirection, shortBeamLength)
+	circleDistance, circlePoint := castCircle(world, beamCircle, beamDirection, shortBeamLength)
 	if circleDistance < closestDistance &&
 		circleDistance < (shortBeamLength-0.001) {
 		closestDistance = circleDistance
@@ -302,7 +337,7 @@ func (c *RadarShortrange) GetDebugState() string {
 	return strconv.FormatFloat(c.value, 'g', 3, 64)
 }
 
-func (c *RadarShortrange) Update(car *Car, objects *world.Objects, port PortDefinition) {
+func (c *RadarShortrange) Update(car *Car, background pixel.PictureColor, world *World, port PortDefinition) {
 	beamLength := float64(10)
 	beamStart := port.WorldPosition.Rotated(-car.Rotation).Add(car.Position)
 	beamDirection := port.Direction.Rotated(-car.Rotation).Unit()
@@ -311,7 +346,7 @@ func (c *RadarShortrange) Update(car *Car, objects *world.Objects, port PortDefi
 		Radius: beamLength,
 	}
 
-	closestDistance, closestPoint := castCircle(objects, beamCircle, beamDirection, beamLength)
+	closestDistance, closestPoint := castCircle(world, beamCircle, beamDirection, beamLength)
 
 	car.DebugLines = append(car.DebugLines, pixel.L(beamStart, closestPoint))
 	c.value = 1 - closestDistance/beamLength
@@ -320,5 +355,54 @@ func (c *RadarShortrange) Update(car *Car, objects *world.Objects, port PortDefi
 func (c *RadarShortrange) SetInputs(values []float64, connected []bool) {
 }
 func (c *RadarShortrange) GetOutputs() []float64 {
+	return []float64{c.value}
+}
+
+type RoadSensor struct {
+	value float64
+}
+
+func (c *RoadSensor) GetDebugState() string {
+	return strconv.FormatFloat(c.value, 'g', 3, 64)
+}
+
+func (c *RoadSensor) Update(car *Car, background pixel.PictureColor, world *World, port PortDefinition) {
+	beamLength := float64(15)
+	beamStart := port.WorldPosition.Rotated(-car.Rotation).Add(car.Position)
+	beamDirection := port.Direction.Rotated(-car.Rotation).Unit()
+	maxBeamExtent := beamStart.Add(beamDirection.Scaled(beamLength))
+
+	maxBrightness := 0.0
+	for i := 0.0; i < beamLength; i += 0.5 {
+		beamHere := beamStart.Add(beamDirection.Scaled(i))
+		colorHere := background.Color(beamHere)
+		brightnessHere := math.Sqrt(
+			0.299*math.Pow(colorHere.R, 2) +
+				0.587*math.Pow(colorHere.G, 2) +
+				0.114*math.Pow(colorHere.B, 2))
+
+		// Detection further away from the sensor is less pronounced
+		factor := 1.0
+		if i < beamLength*0.25 {
+			factor = 1
+		} else if i < beamLength*0.5 {
+			factor = 0.5
+		} else {
+			factor = 0.25
+		}
+		brightnessHere *= factor
+
+		if brightnessHere > maxBrightness {
+			maxBrightness = brightnessHere
+		}
+	}
+
+	car.DebugLines = append(car.DebugLines, pixel.L(beamStart, maxBeamExtent))
+	c.value = maxBrightness
+}
+
+func (c *RoadSensor) SetInputs(values []float64, connected []bool) {
+}
+func (c *RoadSensor) GetOutputs() []float64 {
 	return []float64{c.value}
 }

@@ -48,6 +48,19 @@ func GetOutPinPosition(typeName string, port int) pixel.Vec {
 	return def.OutputPins[port].Position
 }
 
+func GetInPinPosition(typeName string, port int) pixel.Vec {
+	def, ok := Definitions.Components[typeName]
+	if !ok {
+		return pixel.ZV
+	}
+
+	if port < 0 || port >= len(def.InputPins) {
+		return pixel.ZV
+	}
+
+	return def.InputPins[port].Position
+}
+
 func IsComponentAllowedInSlot(id int, typeName string) bool {
 	if id < 0 || id >= len(Definitions.Ports) {
 		return false
@@ -58,4 +71,14 @@ func IsComponentAllowedInSlot(id int, typeName string) bool {
 		return false
 	}
 	return portDef.PortKind == componentDef.PortKind
+}
+
+type SpriteDefs struct {
+	Props      map[string]SpriteDefinition
+	Components map[string]SpriteDefinition
+}
+
+type SpriteDefinition struct {
+	Start pixel.Vec
+	Size  pixel.Vec
 }

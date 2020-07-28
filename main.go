@@ -6,6 +6,7 @@ import (
 	"math"
 	"os"
 	"path/filepath"
+	"sort"
 	"time"
 
 	// Enable loading of PNG files
@@ -14,7 +15,6 @@ import (
 
 	"founderio.net/eljam/elcar"
 	"founderio.net/eljam/paths"
-	"founderio.net/eljam/world"
 	"github.com/BurntSushi/toml"
 	"github.com/faiface/pixel"
 	"github.com/faiface/pixel/imdraw"
@@ -30,7 +30,7 @@ func main() {
 	pixelgl.Run(run)
 }
 
-func loadPicture(filename string) (pixel.Picture, error) {
+func loadPicture(filename string) (*pixel.PictureData, error) {
 	path := filepath.Join(spriteFolder, filename)
 	file, err := os.Open(path)
 	if err != nil {
@@ -53,6 +53,7 @@ var (
 	componentUnknown *pixel.Sprite
 
 	componentSprites map[string]*pixel.Sprite
+	propSprites      map[string]*pixel.Sprite
 
 	spritePinIn      *pixel.Sprite
 	spritePinOut     *pixel.Sprite
@@ -65,12 +66,12 @@ var (
 )
 
 var (
-	car *elcar.Car
+	car   *elcar.Car
+	world *elcar.World
 )
 
 var (
-	hoodScale  float64 = 3
-	worldScale float64 = 4
+	hoodScale float64 = 3
 
 	connectingFromState int
 	connectingFromID    int
@@ -98,9 +99,19 @@ const (
 )
 
 func run() {
+
+	_, err := toml.DecodeFile(filepath.Join("resources", "world.toml"), &world)
+	if err != nil {
+		panic(err)
+	}
+	// Safeguard against wacky maths
+	if world.Scale <= 0.1 {
+		world.Scale = 3
+	}
+
 	cfg := pixelgl.WindowConfig{
 		Title:  "Electronics Jam",
-		Bounds: pixel.R(0, 0, 1800, 1000),
+		Bounds: pixel.R(0, 0, world.Size.X*world.Scale, world.Size.Y*world.Scale),
 	}
 	win, err := pixelgl.NewWindow(cfg)
 	if err != nil {
@@ -112,28 +123,21 @@ func run() {
 		panic(err)
 	}
 
+	_, err = toml.DecodeFile(filepath.Join("resources", "sprites.toml"), &elcar.SpriteDefinitions)
+	if err != nil {
+		panic(err)
+	}
+
 	for typeName, def := range elcar.Definitions.Components {
 		if def.Usable {
 			componentList = append(componentList, typeName)
 		}
 	}
-
-	var world *world.Objects
-	_, err = toml.DecodeFile(filepath.Join("resources", "world.toml"), &world)
-	if err != nil {
-		panic(err)
-	}
-	// For now, calculate from screen size - later on we need to draw a border and add camera panning
-	world.WorldBorder = pixel.R(0, 0, 1920/worldScale, 1080/worldScale)
+	sort.Strings(componentList)
 
 	fontAtlas = text.NewAtlas(basicfont.Face7x13, text.ASCII)
 
-	stonePic, err := loadPicture("stone.png")
-	if err != nil {
-		panic(err)
-	}
-	stoneSprite := pixel.NewSprite(stonePic, stonePic.Bounds())
-
+	// Common + UI Sprites
 	carPic, err := loadPicture("car.png")
 	if err != nil {
 		panic(err)
@@ -146,20 +150,43 @@ func run() {
 	}
 	carHoodSprite = pixel.NewSprite(carHoodPic, carHoodPic.Bounds())
 
-	componentSprites = make(map[string]*pixel.Sprite)
+	worldPic, err := loadPicture(world.BackgroundSprite)
+	if err != nil {
+		panic(err)
+	}
+	worldSprite := pixel.NewSprite(worldPic, worldPic.Bounds())
 
+	// Prop Sprites
+	propSprites = make(map[string]*pixel.Sprite)
+	propSpriteSheet, err := loadPicture("props.png")
+	if err != nil {
+		panic(err)
+	}
+	for name, def := range elcar.SpriteDefinitions.Props {
+		propSprites[name] = pixel.NewSprite(propSpriteSheet, pixel.Rect{
+			Min: def.Start,
+			Max: def.Start.Add(def.Size),
+		})
+	}
+
+	// Component Sprites
+	componentSprites = make(map[string]*pixel.Sprite)
 	componentSpriteSheet, err := loadPicture("components.png")
 	if err != nil {
 		panic(err)
 	}
-	componentEmpty = pixel.NewSprite(componentSpriteSheet,
-		pixel.R(0, 96, 32, 128))
-	componentSprites[elcar.CTypeMultiply] = pixel.NewSprite(componentSpriteSheet,
-		pixel.R(32, 96, 64, 128))
-	componentSprites[elcar.CTypeAdd] = pixel.NewSprite(componentSpriteSheet,
-		pixel.R(64, 96, 96, 128))
-	componentUnknown = pixel.NewSprite(componentSpriteSheet,
-		pixel.R(96, 96, 128, 128))
+	for name, def := range elcar.SpriteDefinitions.Components {
+		componentSprites[name] = pixel.NewSprite(componentSpriteSheet, pixel.Rect{
+			Min: def.Start,
+			Max: def.Start.Add(def.Size),
+		})
+	}
+
+	//TODO: migrate these to sprites.toml
+	// componentSprites[elcar.CTypeMultiply] = pixel.NewSprite(componentSpriteSheet,
+	// 	pixel.R(32, 96, 64, 128))
+	// componentSprites[elcar.CTypeAdd] = pixel.NewSprite(componentSpriteSheet,
+	// 	pixel.R(64, 96, 96, 128))
 
 	componentSprites[elcar.CTypeBuiltinSteering] = pixel.NewSprite(componentSpriteSheet,
 		pixel.R(0, 64, 32, 96))
@@ -188,18 +215,22 @@ func run() {
 	//componentSprites[elcar.CType] = pixel.NewSprite(componentSpriteSheet,
 	//	pixel.R(96, 0, 128, 32))
 
+	// PCB Sprites
 	pcbSpriteSheet, err := loadPicture("pcb.png")
 	if err != nil {
 		panic(err)
 	}
 	spritePinIn = pixel.NewSprite(pcbSpriteSheet, pixel.R(0, 0, 6, 6))
 	spritePinOut = pixel.NewSprite(pcbSpriteSheet, pixel.R(0, 6, 6, 6+6))
-	spriteSensorPort = pixel.NewSprite(pcbSpriteSheet, pixel.R(20, 0, 20+14, 18))
-	spriteChipPort = pixel.NewSprite(pcbSpriteSheet, pixel.R(34, 0, 34+14, 18))
+	componentEmpty = pixel.NewSprite(pcbSpriteSheet, pixel.R(6, 0, 6+14, 18))
+	componentUnknown = pixel.NewSprite(componentSpriteSheet, pixel.R(20, 0, 20+14, 18))
+	spriteSensorPort = pixel.NewSprite(pcbSpriteSheet, pixel.R(34, 0, 34+14, 18))
+	spriteChipPort = pixel.NewSprite(pcbSpriteSheet, pixel.R(48, 0, 48+14, 18))
 
+	// Initialize a default car
 	car = &elcar.Car{
-		Position: pixel.V(150, 120),
-		Rotation: 0,
+		Position: pixel.V(210, 204),
+		Rotation: math.Pi,
 		Speed:    0,
 	}
 
@@ -240,23 +271,40 @@ func run() {
 			}
 		}
 
-		car.Update(dt, world)
+		car.Update(dt, worldPic, world)
 
 		win.Clear(colornames.Gainsboro)
 
-		for _, o := range world.Collidables {
-			stoneSprite.Draw(win, pixel.IM.Moved(o.Bounds().Center()).Scaled(pixel.ZV, worldScale))
+		worldSprite.Draw(win, pixel.IM.Scaled(pixel.ZV, world.Scale).Moved(win.Bounds().Center()))
 
+		// World Walls
+		for _, o := range world.Walls {
 			imd.Clear()
 			imd.Color = colornames.Gray
-			imd.Push(o.Pos.Scaled(worldScale), o.Pos.Add(o.Size).Scaled(worldScale))
+			imd.Push(o.Pos.Scaled(world.Scale), o.Pos.Add(o.Size).Scaled(world.Scale))
+			imd.Rectangle(2)
+			imd.Draw(win)
+		}
+
+		// Props
+		for _, o := range world.Props {
+			sprite, ok := propSprites[o.Name]
+			if !ok {
+				sprite = spriteChipPort
+			}
+
+			sprite.Draw(win, pixel.IM.Moved(sprite.Frame().Size().Scaled(0.5)).Moved(o.Pos).Scaled(pixel.ZV, world.Scale))
+
+			imd.Clear()
+			imd.Color = colornames.Lightblue
+			imd.Push(o.Pos.Scaled(world.Scale), o.Pos.Add(sprite.Frame().Size()).Scaled(world.Scale))
 			imd.Rectangle(2)
 			imd.Draw(win)
 		}
 
 		mat := pixel.IM.Rotated(pixel.ZV, -car.Rotation)
 		mat = mat.Moved(car.Position)
-		mat = mat.Scaled(pixel.ZV, worldScale)
+		mat = mat.Scaled(pixel.ZV, world.Scale)
 		carSprite.Draw(win, mat)
 
 		for _, debug := range car.DebugPoints {
@@ -264,7 +312,7 @@ func run() {
 
 			imd.Color = colornames.Magenta
 			imd.EndShape = imdraw.SharpEndShape
-			imd.Push(car.Position.Scaled(worldScale), debug.Scaled(worldScale))
+			imd.Push(car.Position.Scaled(world.Scale), debug.Scaled(world.Scale))
 			imd.Line(1)
 			imd.Draw(win)
 		}
@@ -274,7 +322,7 @@ func run() {
 
 			imd.Color = colornames.Magenta
 			imd.EndShape = imdraw.SharpEndShape
-			imd.Push(debug.A.Scaled(worldScale), debug.B.Scaled(worldScale))
+			imd.Push(debug.A.Scaled(world.Scale), debug.B.Scaled(world.Scale))
 			imd.Line(1)
 			imd.Draw(win)
 		}
@@ -282,10 +330,16 @@ func run() {
 		switch menu {
 		case MenuClosed:
 			runLevelEditTools(win, dt)
+			if drawMenuButton(win, fontAtlas, "Open Hood [Tab]", pixel.R(0, 0, 350, 50)) {
+				menu = MenuHood
+			}
 
 		case MenuHood:
 			drawHood(win, dt)
 			drawComponentSelector(win, dt)
+			if drawMenuButton(win, fontAtlas, "Close Hood [Tab]", pixel.R(0, 256*hoodScale, 350, 256*hoodScale+50)) {
+				menu = MenuHood
+			}
 
 		case MenuMain:
 			drawMainMenu(win, dt)
@@ -310,7 +364,7 @@ func rectAround(center, size pixel.Vec) pixel.Rect {
 }
 
 func drawMainMenu(win *pixelgl.Window, dt float64) {
-	buttonSize := pixel.V(250, 50)
+	buttonSize := pixel.V(450, 50)
 
 	if drawMenuButton(win, fontAtlas, "Save Car", rectAround(win.Bounds().Center().Add(pixel.V(0, 150)), buttonSize)) {
 		menu = MenuSave
@@ -326,10 +380,10 @@ func drawMainMenu(win *pixelgl.Window, dt float64) {
 }
 
 func drawLoadMenu(win *pixelgl.Window, dt float64) {
-	buttonSize := pixel.V(250, 50)
+	buttonSize := pixel.V(450, 50)
 
 	drawMenuButton(win, fontAtlas, "Load Car", rectAround(win.Bounds().Center().Add(pixel.V(0, 150)), buttonSize))
-	if drawMenuButton(win, fontAtlas, "<", rectAround(win.Bounds().Center().Add(pixel.V(-150, 150)), pixel.V(50, 50))) {
+	if drawMenuButton(win, fontAtlas, "<", rectAround(win.Bounds().Center().Add(pixel.V(-275, 150)), pixel.V(50, 50))) {
 		menu = MenuMain
 	}
 
@@ -359,10 +413,10 @@ func drawLoadMenu(win *pixelgl.Window, dt float64) {
 }
 
 func drawSaveMenu(win *pixelgl.Window, dt float64) {
-	buttonSize := pixel.V(250, 50)
+	buttonSize := pixel.V(450, 50)
 
 	drawMenuButton(win, fontAtlas, "Save Car", rectAround(win.Bounds().Center().Add(pixel.V(0, 150)), buttonSize))
-	if drawMenuButton(win, fontAtlas, "<", rectAround(win.Bounds().Center().Add(pixel.V(-150, 150)), pixel.V(50, 50))) {
+	if drawMenuButton(win, fontAtlas, "<", rectAround(win.Bounds().Center().Add(pixel.V(-275, 150)), pixel.V(50, 50))) {
 		menu = MenuMain
 	}
 
@@ -446,14 +500,14 @@ func drawMenuButton(win *pixelgl.Window, atlas *text.Atlas, buttonText string, b
 
 	imd := imdraw.New(nil)
 
-	imd.Color = colornames.Black
+	imd.Color = colornames.Goldenrod
 	imd.EndShape = imdraw.RoundEndShape
 	imd.Push(bounds.Min, bounds.Max)
 	imd.Rectangle(4)
 	imd.Draw(win)
 
 	textDraw := text.New(bounds.Center(), atlas)
-	textDraw.Color = colornames.Black
+	textDraw.Color = colornames.Goldenrod
 	textDraw.Dot.X -= textDraw.BoundsOf(buttonText).W() / 2
 	textDraw.Dot.Y -= textDraw.LineHeight / textScale
 	textDraw.WriteString(buttonText)
@@ -463,21 +517,14 @@ func drawMenuButton(win *pixelgl.Window, atlas *text.Atlas, buttonText string, b
 		bounds.Contains(win.MousePosition())
 }
 
-func drawButton(win *pixelgl.Window, sprite *pixel.Sprite, bounds pixel.Rect, scale pixel.Vec) bool {
-	sprite.Draw(win, pixel.IM.ScaledXY(pixel.ZV, scale).Moved(bounds.Center()))
-
-	return win.JustReleased(pixelgl.MouseButtonLeft) &&
-		bounds.Contains(win.MousePosition())
-}
-
 func runLevelEditTools(win *pixelgl.Window, dt float64) {
 	if win.JustPressed(pixelgl.MouseButtonLeft) {
-		dragRectStartPoint = win.MousePosition().Scaled(1 / worldScale)
+		dragRectStartPoint = win.MousePosition().Scaled(1 / world.Scale)
 	}
 	if win.JustReleased(pixelgl.MouseButtonLeft) {
-		dragRectEndPoint := win.MousePosition().Scaled(1 / worldScale)
+		dragRectEndPoint := win.MousePosition().Scaled(1 / world.Scale)
 		rect := pixel.R(dragRectStartPoint.X, dragRectStartPoint.Y, dragRectEndPoint.X, dragRectEndPoint.Y)
-		fmt.Printf("[[Collidables]]\nPos = { X = %4.2f, Y = %4.2f }\nSize = { X = %4.2f, Y = %4.2f }\n",
+		fmt.Printf("[[Walls]]\nPos = { X = %4.2f, Y = %4.2f }\nSize = { X = %4.2f, Y = %4.2f }\n",
 			rect.Min.X, rect.Min.Y, rect.Size().X, rect.Size().Y)
 	}
 }
@@ -576,7 +623,7 @@ func drawHood(win *pixelgl.Window, dt float64) {
 				if selectingComponent != "" && !elcar.IsComponentAllowedInSlot(idx, selectingComponent) {
 					tint = color.RGBA{R: 200, A: 40}
 				} else {
-					tint = color.Alpha{A: 40}
+					tint = color.Alpha{A: 70}
 				}
 				componentEmpty.DrawColorMask(win, pixel.IM.Moved(port.HoodPosition).Scaled(pixel.ZV, hoodScale), tint)
 
@@ -695,7 +742,7 @@ func drawComponentSelector(win *pixelgl.Window, dt float64) {
 
 		if rect.Contains(win.MousePosition().Scaled(1 / hoodScale)) {
 
-			componentEmpty.DrawColorMask(win, pixel.IM.Moved(basePos).Moved(singlePos).Moved(pixel.V(16, 16)).Scaled(pixel.ZV, hoodScale), color.Alpha{A: 40})
+			componentEmpty.DrawColorMask(win, pixel.IM.Moved(basePos).Moved(singlePos).Moved(pixel.V(16, 16)).Scaled(pixel.ZV, hoodScale), color.Alpha{A: 70})
 
 			// Change selected component
 			if win.JustPressed(pixelgl.MouseButtonLeft) {
@@ -715,19 +762,6 @@ func drawComponentSelector(win *pixelgl.Window, dt float64) {
 		}
 		sprite.Draw(win, pixel.IM.Scaled(pixel.ZV, hoodScale).Moved(win.MousePosition()).Moved(pixel.V(16, -16).Scaled(hoodScale)))
 	}
-}
-
-func getInPinPosition(typeName string, port int) pixel.Vec {
-	def, ok := elcar.Definitions.Components[typeName]
-	if !ok {
-		return pixel.ZV
-	}
-
-	if port < 0 || port >= len(def.InputPins) {
-		return pixel.ZV
-	}
-
-	return def.InputPins[port].Position
 }
 
 func drawComponentConnections(win *pixelgl.Window, id int) {
@@ -756,7 +790,7 @@ func drawComponentConnections(win *pixelgl.Window, id int) {
 
 		targetPos := elcar.Definitions.Ports[conn.ID].HoodPosition
 
-		pinOffsetIn := getInPinPosition(targetComponent.TypeName, conn.Pin)
+		pinOffsetIn := elcar.GetInPinPosition(targetComponent.TypeName, conn.Pin)
 
 		imd := imdraw.New(nil)
 		imd.Color = colornames.Red

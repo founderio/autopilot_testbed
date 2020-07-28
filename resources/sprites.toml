@@ -1,0 +1,31 @@
+
+[Components.constant]
+
+Start = { X = 0.0, Y = 96.0 }
+Size = { X = 32.0, Y = 32.0 }
+
+[Components.multiply]
+
+Start = { X = 32.0, Y = 96.0 }
+Size = { X = 32.0, Y = 32.0 }
+
+[Components.add]
+
+Start = { X = 64.0, Y = 96.0 }
+Size = { X = 32.0, Y = 32.0 }
+
+[Components.road_sensor]
+
+Start = { X = 96.0, Y = 96.0 }
+Size = { X = 32.0, Y = 32.0 }
+
+
+[Props.roadblock_h]
+
+Start = { X = 0.0, Y = 0.0 }
+Size = { X = 17.0, Y = 11.0 }
+
+[Props.roadblock_v]
+
+Start = { X = 19.0, Y = 0.0 }
+Size = { X = 6.0, Y = 14.0 }

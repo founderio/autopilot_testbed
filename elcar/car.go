@@ -3,7 +3,6 @@ package elcar
 import (
 	"math"
 
-	"founderio.net/eljam/world"
 	"github.com/faiface/pixel"
 )
 
@@ -28,12 +27,16 @@ const (
 	CTypeSubtract        = "subtract"
 	CTypeRadar           = "radar"
 	CTypeRadarShortrange = "radar_shortrange"
+	CTypeRoadSensor      = "road_sensor"
 	CTypeConstant        = "constant"
 	CTypeSplitSignal     = "split_signal"
 	CTypeCompareEquals   = "compare_equals"
 )
 
-var Definitions Defs
+var (
+	Definitions       Defs
+	SpriteDefinitions SpriteDefs
+)
 
 var ComponentMakerFuncs = map[string]func() Component{
 	CTypeBuiltinSteering: func() Component {
@@ -69,6 +72,9 @@ var ComponentMakerFuncs = map[string]func() Component{
 	},
 	CTypeRadarShortrange: func() Component {
 		return &RadarShortrange{}
+	},
+	CTypeRoadSensor: func() Component {
+		return &RoadSensor{}
 	},
 }
 
@@ -170,7 +176,7 @@ func (c *Car) Forward() pixel.Vec {
 	return pixel.Unit(-c.Rotation)
 }
 
-func (c *Car) Update(dt float64, objects *world.Objects) {
+func (c *Car) Update(dt float64, background pixel.PictureColor, world *World) {
 	// Update electronics
 	//TODO: Electronics should update on separate tick
 	{
@@ -204,7 +210,7 @@ func (c *Car) Update(dt float64, objects *world.Objects) {
 
 			inputs, connected := calculateComponentInputs(component.ID, len(def.InputPins), outputValues)
 			component.State.SetInputs(inputs, connected)
-			component.State.Update(c, objects, port)
+			component.State.Update(c, background, world, port)
 		}
 	}
 
@@ -228,7 +234,7 @@ func (c *Car) Update(dt float64, objects *world.Objects) {
 
 		dir := c.Forward().Scaled(c.Speed * dt)
 		newPosition := c.Position.Add(dir)
-		if c.collidesWhenMovedTo(newPosition, objects) {
+		if c.collidesWhenMovedTo(newPosition, world) {
 			c.Speed = 0
 		} else {
 			c.Position = newPosition
@@ -237,24 +243,37 @@ func (c *Car) Update(dt float64, objects *world.Objects) {
 
 }
 
-func (c *Car) collidesWhenMovedTo(pos pixel.Vec, objects *world.Objects) bool {
+func (c *Car) collidesWhenMovedTo(pos pixel.Vec, world *World) bool {
 
 	carWidth := float64(10)
 
 	// Stop at world border to contain the car
-	if !objects.WorldBorder.Contains(pos) {
+	if !world.Bounds().Contains(pos) {
 		return true
 	}
-	for _, edge := range objects.WorldBorder.Edges() {
+	for _, edge := range world.Bounds().Edges() {
 		closestOnLine := edge.Closest(pos)
 		if absDistance(closestOnLine, pos) < carWidth {
 			return true
 		}
 	}
 
-	for _, o := range objects.Collidables {
-		edges := o.Bounds().Edges()
-		for _, edge := range edges {
+	for _, o := range world.Walls {
+		for _, edge := range o.Bounds().Edges() {
+			closestOnLine := edge.Closest(pos)
+			if absDistance(closestOnLine, pos) < carWidth {
+				return true
+			}
+		}
+	}
+
+	for _, o := range world.Props {
+		def, ok := SpriteDefinitions.Props[o.Name]
+		if !ok {
+			continue
+		}
+
+		for _, edge := range o.Bounds(def).Edges() {
 			closestOnLine := edge.Closest(pos)
 			if absDistance(closestOnLine, pos) < carWidth {
 				return true
@@ -315,7 +334,7 @@ type ComponentDestination struct {
 }
 
 type Component interface {
-	Update(car *Car, objects *world.Objects, port PortDefinition)
+	Update(car *Car, background pixel.PictureColor, world *World, port PortDefinition)
 
 	GetDebugState() string
 
