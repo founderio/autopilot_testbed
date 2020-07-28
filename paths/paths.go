@@ -11,8 +11,8 @@ import (
 )
 
 const (
-	appFolder        = "elcar"
-	appFolderReverse = "net.founderio.elcar"
+	appFolder        = "autopilot_testbed"
+	appFolderReverse = "net.founderio.autopilot_testbed"
 )
 
 var (

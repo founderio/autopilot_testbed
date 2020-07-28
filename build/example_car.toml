@@ -1,0 +1,270 @@
+[[Components]]
+  ID = 0
+  TypeName = "builtin_steering"
+  ConnectedOutputs = []
+
+[[Components]]
+  ID = 2
+  TypeName = "builtin_acceleration"
+  ConnectedOutputs = []
+
+[[Components]]
+  ID = 3
+  TypeName = "builtin_braking"
+  ConnectedOutputs = []
+
+[[Components]]
+  ID = 5
+  TypeName = "radar_shortrange"
+
+  [[Components.ConnectedOutputs]]
+    ID = 13
+    Pin = 0
+
+[[Components]]
+  ID = 13
+  TypeName = "multiply"
+
+  [[Components.ConnectedOutputs]]
+    ID = 0
+    Pin = 1
+
+[[Components]]
+  ID = 8
+  TypeName = "radar"
+
+  [[Components.ConnectedOutputs]]
+    ID = 0
+    Pin = 0
+
+[[Components]]
+  ID = 7
+  TypeName = "radar"
+
+  [[Components.ConnectedOutputs]]
+    ID = 0
+    Pin = 1
+
+[[Components]]
+  ID = 10
+  TypeName = "road_sensor"
+
+  [[Components.ConnectedOutputs]]
+    ID = 31
+    Pin = 0
+
+[[Components]]
+  ID = 9
+  TypeName = "road_sensor"
+
+  [[Components.ConnectedOutputs]]
+    ID = 15
+    Pin = 0
+
+[[Components]]
+  ID = 6
+  TypeName = "radar"
+
+  [[Components.ConnectedOutputs]]
+    ID = 14
+    Pin = 0
+
+[[Components]]
+  ID = 18
+  TypeName = "subtract"
+
+  [[Components.ConnectedOutputs]]
+    ID = 2
+    Pin = 0
+
+[[Components]]
+  ID = 14
+  TypeName = "split_signal"
+
+  [[Components.ConnectedOutputs]]
+    ID = 3
+    Pin = 0
+
+  [[Components.ConnectedOutputs]]
+    ID = -1
+    Pin = 0
+
+  [[Components.ConnectedOutputs]]
+    ID = 18
+    Pin = 1
+
+[[Components]]
+  ID = 17
+  TypeName = "constant"
+
+  [[Components.ConnectedOutputs]]
+    ID = -1
+    Pin = 0
+
+  [[Components.ConnectedOutputs]]
+    ID = 18
+    Pin = 0
+
+  [[Components.ConnectedOutputs]]
+    ID = -1
+    Pin = 0
+
+[[Components]]
+  ID = 12
+  TypeName = "constant"
+
+  [[Components.ConnectedOutputs]]
+    ID = -1
+    Pin = 0
+
+  [[Components.ConnectedOutputs]]
+    ID = -1
+    Pin = 0
+
+  [[Components.ConnectedOutputs]]
+    ID = 13
+    Pin = 1
+
+[[Components]]
+  ID = 20
+  TypeName = "multiply"
+
+  [[Components.ConnectedOutputs]]
+    ID = 27
+    Pin = 0
+
+[[Components]]
+  ID = 25
+  TypeName = "multiply"
+
+  [[Components.ConnectedOutputs]]
+    ID = 32
+    Pin = 1
+
+[[Components]]
+  ID = 24
+  TypeName = "constant"
+
+  [[Components.ConnectedOutputs]]
+    ID = -1
+    Pin = 0
+
+  [[Components.ConnectedOutputs]]
+    ID = -1
+    Pin = 0
+
+  [[Components.ConnectedOutputs]]
+    ID = 25
+    Pin = 2
+
+[[Components]]
+  ID = 19
+  TypeName = "constant"
+
+  [[Components.ConnectedOutputs]]
+    ID = -1
+    Pin = 0
+
+  [[Components.ConnectedOutputs]]
+    ID = -1
+    Pin = 0
+
+  [[Components.ConnectedOutputs]]
+    ID = 20
+    Pin = 2
+
+[[Components]]
+  ID = 22
+  TypeName = "compare_equals"
+
+  [[Components.ConnectedOutputs]]
+    ID = 29
+    Pin = 1
+
+[[Components]]
+  ID = 15
+  TypeName = "split_signal"
+
+  [[Components.ConnectedOutputs]]
+    ID = -1
+    Pin = 0
+
+  [[Components.ConnectedOutputs]]
+    ID = 22
+    Pin = 0
+
+  [[Components.ConnectedOutputs]]
+    ID = 20
+    Pin = 0
+
+[[Components]]
+  ID = 31
+  TypeName = "split_signal"
+
+  [[Components.ConnectedOutputs]]
+    ID = -1
+    Pin = 0
+
+  [[Components.ConnectedOutputs]]
+    ID = 22
+    Pin = 1
+
+  [[Components.ConnectedOutputs]]
+    ID = 25
+    Pin = 1
+
+[[Components]]
+  ID = 29
+  TypeName = "subtract"
+
+  [[Components.ConnectedOutputs]]
+    ID = 30
+    Pin = 0
+
+[[Components]]
+  ID = 28
+  TypeName = "constant"
+
+  [[Components.ConnectedOutputs]]
+    ID = -1
+    Pin = 0
+
+  [[Components.ConnectedOutputs]]
+    ID = 29
+    Pin = 0
+
+  [[Components.ConnectedOutputs]]
+    ID = -1
+    Pin = 0
+
+[[Components]]
+  ID = 27
+  TypeName = "multiply"
+
+  [[Components.ConnectedOutputs]]
+    ID = 0
+    Pin = 1
+
+[[Components]]
+  ID = 30
+  TypeName = "split_signal"
+
+  [[Components.ConnectedOutputs]]
+    ID = 32
+    Pin = 0
+
+  [[Components.ConnectedOutputs]]
+    ID = 27
+    Pin = 1
+
+  [[Components.ConnectedOutputs]]
+    ID = -1
+    Pin = 0
+
+[[Components]]
+  ID = 32
+  TypeName = "multiply"
+
+  [[Components.ConnectedOutputs]]
+    ID = 0
+    Pin = 0
