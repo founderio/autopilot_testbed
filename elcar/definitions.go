@@ -29,6 +29,9 @@ type ComponentDefinition struct {
 	PortKind   PortKind
 	InputPins  []PinDefinition
 	OutputPins []PinDefinition
+
+	Name        string
+	Description string
 }
 
 type PinDefinition struct {

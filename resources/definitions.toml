@@ -27,6 +27,9 @@ InputPins = [
 
 [Components.add]
 
+Name = "Add"
+Description = "Adds all input values"
+
 Usable = true
 PortKind = "chip"
 InputPins = [
@@ -40,6 +43,9 @@ OutputPins = [
 
 [Components.subtract]
 
+Name = "Subtract"
+Description = "Substracts the lower pin\nfrom the upper pin"
+
 Usable = true
 PortKind = "chip"
 InputPins = [
@@ -51,6 +57,9 @@ OutputPins = [
 ]
 
 [Components.split_signal]
+
+Name = "Signal Split"
+Description = "Replicates the input signal\non all output pins"
 
 Usable = true
 PortKind = "chip"
@@ -65,6 +74,9 @@ OutputPins = [
 
 [Components.compare_equals]
 
+Name = "Compare"
+Description = "Provides a larger value the closer\nthe inputs are to each other"
+
 Usable = true
 PortKind = "chip"
 InputPins = [
@@ -76,6 +88,9 @@ OutputPins = [
 ]
 
 [Components.multiply]
+
+Name = "Multiply"
+Description = "Multiplies all input values"
 
 Usable = true
 PortKind = "chip"
@@ -90,6 +105,9 @@ OutputPins = [
 
 [Components.constant]
 
+Name = "Constant Value"
+Description = "Provides 0.5, 1 and 2\non the output pins from top to bottom"
+
 Usable = true
 PortKind = "chip"
 OutputPins = [
@@ -101,6 +119,9 @@ OutputPins = [
 
 [Components.radar]
 
+Name = "Radar"
+Description = "Checks for collisions\nin front of the sensor"
+
 Usable = true
 PortKind = "sensor"
 OutputPins = [
@@ -109,6 +130,9 @@ OutputPins = [
 
 [Components.radar_shortrange]
 
+Name = "Short Range Radar"
+Description = "Checks for collisions\nin front of the sensor"
+
 Usable = true
 PortKind = "sensor"
 OutputPins = [
@@ -116,6 +140,9 @@ OutputPins = [
 ]
 
 [Components.road_sensor]
+
+Name = "Road Sensor"
+Description = "Checks for ground brightness\nin front of the sensor"
 
 Usable = true
 PortKind = "sensor"

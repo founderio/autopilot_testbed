@@ -7,6 +7,7 @@ import (
 	"os"
 	"path/filepath"
 	"sort"
+	"strings"
 	"time"
 
 	// Enable loading of PNG files
@@ -47,7 +48,8 @@ func loadPicture(filename string) (*pixel.PictureData, error) {
 var (
 	fontAtlas *text.Atlas
 
-	carHoodSprite *pixel.Sprite
+	carHoodSprite     *pixel.Sprite
+	componentBGSprite *pixel.Sprite
 
 	componentEmpty   *pixel.Sprite
 	componentUnknown *pixel.Sprite
@@ -150,6 +152,12 @@ func run() {
 	}
 	carHoodSprite = pixel.NewSprite(carHoodPic, carHoodPic.Bounds())
 
+	componentBGPic, err := loadPicture("component_bg.png")
+	if err != nil {
+		panic(err)
+	}
+	componentBGSprite = pixel.NewSprite(componentBGPic, componentBGPic.Bounds())
+
 	worldPic, err := loadPicture(world.BackgroundSprite)
 	if err != nil {
 		panic(err)
@@ -181,39 +189,6 @@ func run() {
 			Max: def.Start.Add(def.Size),
 		})
 	}
-
-	//TODO: migrate these to sprites.toml
-	// componentSprites[elcar.CTypeMultiply] = pixel.NewSprite(componentSpriteSheet,
-	// 	pixel.R(32, 96, 64, 128))
-	// componentSprites[elcar.CTypeAdd] = pixel.NewSprite(componentSpriteSheet,
-	// 	pixel.R(64, 96, 96, 128))
-
-	componentSprites[elcar.CTypeBuiltinSteering] = pixel.NewSprite(componentSpriteSheet,
-		pixel.R(0, 64, 32, 96))
-	componentSprites[elcar.CTypeSubtract] = pixel.NewSprite(componentSpriteSheet,
-		pixel.R(32, 64, 64, 96))
-	componentSprites[elcar.CTypeBuiltinAcceleration] = pixel.NewSprite(componentSpriteSheet,
-		pixel.R(64, 64, 96, 96))
-	componentSprites[elcar.CTypeBuiltinBraking] = pixel.NewSprite(componentSpriteSheet,
-		pixel.R(96, 64, 128, 96))
-
-	componentSprites[elcar.CTypeRadar] = pixel.NewSprite(componentSpriteSheet,
-		pixel.R(0, 32, 32, 64))
-	componentSprites[elcar.CTypeCompareEquals] = pixel.NewSprite(componentSpriteSheet,
-		pixel.R(32, 32, 64, 64))
-	componentSprites[elcar.CTypeSplitSignal] = pixel.NewSprite(componentSpriteSheet,
-		pixel.R(64, 32, 96, 64))
-	componentSprites[elcar.CTypeRadarShortrange] = pixel.NewSprite(componentSpriteSheet,
-		pixel.R(96, 32, 128, 64))
-
-	//componentSprites[elcar.CType] = pixel.NewSprite(componentSpriteSheet,
-	//	pixel.R(0, 0, 32, 32))
-	//componentSprites[elcar.CType] = pixel.NewSprite(componentSpriteSheet,
-	//	pixel.R(32, 0, 64, 32))
-	//componentSprites[elcar.CType] = pixel.NewSprite(componentSpriteSheet,
-	//	pixel.R(64, 0, 96, 32))
-	//componentSprites[elcar.CType] = pixel.NewSprite(componentSpriteSheet,
-	//	pixel.R(96, 0, 128, 32))
 
 	// PCB Sprites
 	pcbSpriteSheet, err := loadPicture("pcb.png")
@@ -495,6 +470,15 @@ func drawError(win *pixelgl.Window, atlas *text.Atlas, errorText string, locatio
 	textDraw.Draw(win, pixel.IM.Scaled(location, textScale))
 }
 
+func drawText(win *pixelgl.Window, atlas *text.Atlas, content string, location pixel.Vec) {
+	textScale := float64(1.5)
+
+	textDraw := text.New(location, atlas)
+	textDraw.Color = colornames.White
+	textDraw.WriteString(content)
+	textDraw.Draw(win, pixel.IM.Scaled(location, textScale))
+}
+
 func drawMenuButton(win *pixelgl.Window, atlas *text.Atlas, buttonText string, bounds pixel.Rect) bool {
 	textScale := float64(3)
 
@@ -727,28 +711,49 @@ func drawHood(win *pixelgl.Window, dt float64) {
 }
 
 func drawComponentSelector(win *pixelgl.Window, dt float64) {
-	basePos := pixel.V(270, 160)
+	componentBGSprite.Draw(win, pixel.IM.Moved(pixel.V(carHoodSprite.Frame().W(), 0)).Moved(componentBGSprite.Frame().Center()).Scaled(pixel.ZV, hoodScale))
 
-	for i, typeName := range componentList {
-		singlePos := pixel.V(float64((i%2)*32), float64((i/-2)*32))
+	basePos := pixel.V(carHoodSprite.Frame().H()+20, carHoodSprite.Frame().W()+-20)
+
+	top := 0.0
+
+	for _, typeName := range componentList {
+		def := elcar.Definitions.Components[typeName]
+		moveDown := 20.0
+
+		singlePos := pixel.V(0, top)
+		rectCenter := basePos.Add(singlePos)
 
 		sprite := componentSprites[typeName]
 		if sprite == nil {
 			sprite = componentUnknown
 		}
-		sprite.Draw(win, pixel.IM.Moved(basePos).Moved(singlePos).Moved(pixel.V(16, 16)).Scaled(pixel.ZV, hoodScale))
+		sprite.Draw(win, pixel.IM.Moved(rectCenter).Scaled(pixel.ZV, hoodScale))
 
-		rect := pixel.R(singlePos.X+basePos.X+10, singlePos.Y+basePos.Y+7, singlePos.X+basePos.X+24, singlePos.Y+basePos.Y+26)
+		rect := pixel.Rect{
+			Min: rectCenter.Sub(componentEmpty.Frame().Size().Scaled(0.5)).Scaled(hoodScale),
+			Max: rectCenter.Add(componentEmpty.Frame().Size().Scaled(0.5)).Scaled(hoodScale),
+		}
 
-		if rect.Contains(win.MousePosition().Scaled(1 / hoodScale)) {
+		if rect.Contains(win.MousePosition()) {
 
-			componentEmpty.DrawColorMask(win, pixel.IM.Moved(basePos).Moved(singlePos).Moved(pixel.V(16, 16)).Scaled(pixel.ZV, hoodScale), color.Alpha{A: 70})
+			componentEmpty.DrawColorMask(win, pixel.IM.Moved(rectCenter).Scaled(pixel.ZV, hoodScale), color.Alpha{A: 70})
 
 			// Change selected component
 			if win.JustPressed(pixelgl.MouseButtonLeft) {
 				selectingComponent = typeName
 			}
 		}
+
+		drawText(win, fontAtlas, def.Name, basePos.Add(singlePos).Add(pixel.V(14, 4)).Scaled(hoodScale))
+		desc := strings.Split(def.Description, "\n")
+		for i, line := range desc {
+			drawText(win, fontAtlas, line, basePos.Add(singlePos).Add(pixel.V(14, float64(-4+i*-5))).Scaled(hoodScale))
+		}
+		if len(desc) > 1 {
+			moveDown += float64(len(desc)-1) * 5
+		}
+		top -= moveDown
 	}
 
 	if win.JustPressed(pixelgl.MouseButtonRight) {

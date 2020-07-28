@@ -5,8 +5,8 @@ Size = { X = 475.00, Y = 250.00 }
 BackgroundSprite = "racetrack.png"
 
 [[Walls]]
-Pos = { X = 195.00, Y = 230.50 }
-Size = { X = 129.50, Y = -6.50 }
+Pos = { X = 205.25, Y = 228.50 }
+Size = { X = 129.25, Y = -3.75 }
 
 [[Props]]
 Pos = { X = 362.50, Y = 176.75 }

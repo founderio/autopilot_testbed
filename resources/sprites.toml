@@ -1,23 +1,65 @@
 
 [Components.constant]
 
-Start = { X = 0.0, Y = 96.0 }
-Size = { X = 32.0, Y = 32.0 }
+Start = { X = 0.0, Y = 36.0 }
+Size = { X = 14.0, Y = 18.0 }
 
 [Components.multiply]
 
-Start = { X = 32.0, Y = 96.0 }
-Size = { X = 32.0, Y = 32.0 }
+Start = { X = 14.0, Y = 36.0 }
+Size = { X = 14.0, Y = 18.0 }
 
 [Components.add]
 
-Start = { X = 64.0, Y = 96.0 }
-Size = { X = 32.0, Y = 32.0 }
+Start = { X = 28.0, Y = 36.0 }
+Size = { X = 14.0, Y = 18.0 }
+
+[Components.compare_equals]
+
+Start = { X = 42.0, Y = 36.0 }
+Size = { X = 14.0, Y = 18.0 }
+
+
+[Components.builtin_steering]
+
+Start = { X = 0.0, Y = 18.0 }
+Size = { X = 14.0, Y = 18.0 }
+
+[Components.subtract]
+
+Start = { X = 14.0, Y = 18.0 }
+Size = { X = 14.0, Y = 18.0 }
+
+[Components.builtin_acceleration]
+
+Start = { X = 28.0, Y = 18.0 }
+Size = { X = 14.0, Y = 18.0 }
+
+[Components.builtin_braking]
+
+Start = { X = 42.0, Y = 18.0 }
+Size = { X = 14.0, Y = 18.0 }
+
+
+[Components.radar]
+
+Start = { X = 0.0, Y = 0.0 }
+Size = { X = 14.0, Y = 18.0 }
 
 [Components.road_sensor]
 
-Start = { X = 96.0, Y = 96.0 }
-Size = { X = 32.0, Y = 32.0 }
+Start = { X = 14.0, Y = 0.0 }
+Size = { X = 14.0, Y = 18.0 }
+
+[Components.split_signal]
+
+Start = { X = 28.0, Y = 0.0 }
+Size = { X = 14.0, Y = 18.0 }
+
+[Components.radar_shortrange]
+
+Start = { X = 42.0, Y = 0.0 }
+Size = { X = 14.0, Y = 18.0 }
 
 
 [Props.roadblock_h]
