@@ -34,3 +34,11 @@ build_cc_windows:
 	CGO_LDFLAGS_ALLOW="-Wl,-luuid" \
 	CGO_CFLAGS_ALLOW="-Wl,-luuid" \
 	go build -mod=vendor -v -o $(OUT)/autopilot_testbed.exe  -ldflags="-H=windowsgui" main.go
+
+.PHONY: package_windows
+package_windows:
+	cd build/out && rm -f autopilot_testbed_windows.zip && zip -r autopilot_testbed_windows.zip resources/ autopilot_testbed.exe
+
+.PHONY: package_linux
+package_linux:
+	cd build/out && rm -f autopilot_testbed_linux.tar.gz && tar czf autopilot_testbed_linux.tar.gz resources/ autopilot_testbed

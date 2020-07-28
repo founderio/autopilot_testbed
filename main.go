@@ -6,6 +6,7 @@ import (
 	"math"
 	"os"
 	"path/filepath"
+	"runtime"
 	"sort"
 	"strings"
 	"time"
@@ -98,6 +99,7 @@ const (
 	MenuMain
 	MenuSave
 	MenuLoad
+	MenuCredits
 )
 
 func run() {
@@ -112,7 +114,7 @@ func run() {
 	}
 
 	cfg := pixelgl.WindowConfig{
-		Title:  "Electronics Jam",
+		Title:  "Autopilot Testbed",
 		Bounds: pixel.R(0, 0, world.Size.X*world.Scale, world.Size.Y*world.Scale),
 	}
 	win, err := pixelgl.NewWindow(cfg)
@@ -235,6 +237,8 @@ func run() {
 				fallthrough
 			case MenuSave:
 				fallthrough
+			case MenuCredits:
+				fallthrough
 			case MenuClosed:
 				menu = MenuMain
 
@@ -327,6 +331,9 @@ func run() {
 
 		case MenuSave:
 			drawSaveMenu(win, dt)
+
+		case MenuCredits:
+			drawCredits(win, dt)
 		}
 
 		win.Update()
@@ -356,7 +363,10 @@ func drawMainMenu(win *pixelgl.Window, dt float64) {
 		menu = MenuLoad
 		loadSaveEntries()
 	}
-	if drawMenuButton(win, fontAtlas, "Exit", rectAround(win.Bounds().Center().Add(pixel.V(0, -150)), buttonSize)) {
+	if drawMenuButton(win, fontAtlas, "Credits", rectAround(win.Bounds().Center().Add(pixel.V(0, -50)), buttonSize)) {
+		menu = MenuCredits
+	}
+	if drawMenuButton(win, fontAtlas, "Exit", rectAround(win.Bounds().Center().Add(pixel.V(0, -250)), buttonSize)) {
 		win.SetClosed(true)
 	}
 }
@@ -427,6 +437,18 @@ func drawSaveMenu(win *pixelgl.Window, dt float64) {
 	}
 }
 
+func drawCredits(win *pixelgl.Window, dt float64) {
+	buttonSize := pixel.V(450, 50)
+
+	drawMenuButton(win, fontAtlas, "Credits", rectAround(win.Bounds().Center().Add(pixel.V(0, 150)), buttonSize))
+	if drawMenuButton(win, fontAtlas, "<", rectAround(win.Bounds().Center().Add(pixel.V(-275, 150)), pixel.V(50, 50))) {
+		menu = MenuMain
+	}
+
+	drawCreditsText(win, fontAtlas, "This is a game prototype developed by Oliver Kahrmann (founderio)", win.Bounds().Center().Add(pixel.V(0, 40)))
+	drawCreditsText(win, fontAtlas, "Built using "+runtime.Version()+" and the Pixel engine", win.Bounds().Center())
+}
+
 func loadCar(slot int) error {
 	filename := getSaveFileName(slot)
 	return car.Load(filename)
@@ -474,6 +496,16 @@ func drawError(win *pixelgl.Window, atlas *text.Atlas, errorText string, locatio
 	textDraw.Dot.X -= textDraw.BoundsOf(errorText).W() / 2
 	textDraw.Dot.Y -= textDraw.LineHeight / textScale
 	textDraw.WriteString(errorText)
+	textDraw.Draw(win, pixel.IM.Scaled(location, textScale))
+}
+
+func drawCreditsText(win *pixelgl.Window, atlas *text.Atlas, content string, location pixel.Vec) {
+	textScale := float64(2.5)
+
+	textDraw := text.New(location, atlas)
+	textDraw.Color = colornames.Goldenrod
+	textDraw.Dot.X -= textDraw.BoundsOf(content).W() / 2
+	textDraw.WriteString(content)
 	textDraw.Draw(win, pixel.IM.Scaled(location, textScale))
 }
 
