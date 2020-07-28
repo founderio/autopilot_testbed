@@ -1,4 +1,4 @@
-module founderio.net/eljam
+module founderio.net/autopilot_testbed
 
 go 1.14
 

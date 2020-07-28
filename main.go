@@ -15,13 +15,13 @@ import (
 	"image/color"
 	_ "image/png"
 
-	"founderio.net/eljam/elcar"
-	"founderio.net/eljam/paths"
 	"github.com/BurntSushi/toml"
 	"github.com/faiface/pixel"
 	"github.com/faiface/pixel/imdraw"
 	"github.com/faiface/pixel/pixelgl"
 	"github.com/faiface/pixel/text"
+	"github.com/founderio/autopilot_testbed/elcar"
+	"github.com/founderio/autopilot_testbed/paths"
 	"golang.org/x/image/colornames"
 	"golang.org/x/image/font/basicfont"
 )
