@@ -231,6 +231,9 @@ func run() {
 				menu = MenuClosed
 			}
 		}
+		if menu == MenuClosed && win.JustPressed(pixelgl.KeyR) {
+			resetCarPosition()
+		}
 		if win.JustPressed(pixelgl.KeyEscape) {
 			switch menu {
 			case MenuLoad:
@@ -312,6 +315,9 @@ func run() {
 			if drawMenuButton(win, fontAtlas, "Open Hood [Tab]", pixel.R(0, 0, 350, 50)) {
 				menu = MenuHood
 			}
+			if drawMenuButton(win, fontAtlas, "Reset Car Position [R]", pixel.R(350, 0, 350+500, 50)) {
+				resetCarPosition()
+			}
 			if drawMenuButton(win, fontAtlas, "Menu [Esc]", pixel.R(0, win.Bounds().H()-50, 350, win.Bounds().H())) {
 				menu = MenuMain
 			}
@@ -338,6 +344,18 @@ func run() {
 
 		win.Update()
 	}
+}
+
+func resetCarPosition() {
+	car.Position = pixel.V(210, 204)
+	car.Rotation = math.Pi
+	car.Speed = 0
+
+	car.Steering = 0
+	car.Acceleration = 0
+	car.Braking = 0
+
+	car.ResetComponentState()
 }
 
 func rectAround(center, size pixel.Vec) pixel.Rect {

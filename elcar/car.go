@@ -96,6 +96,12 @@ type Car struct {
 	DebugLines  []pixel.Line
 }
 
+func (c *Car) ResetComponentState() {
+	for _, component := range c.Components {
+		component.State = ComponentMakerFuncs[component.TypeName]()
+	}
+}
+
 func (c *Car) GetComponent(id int) UsedComponent {
 	for _, component := range c.Components {
 		if component.ID == id {
