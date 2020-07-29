@@ -5,6 +5,7 @@ Ensure modvendor is installed by running `go get -u github.com/goware/modvendor`
 ```sh
 make build
 ```
+Best is to also use the build container though, to avoid issues with library versions.
 
 On linux, cross-compile for windows:
 ```sh

@@ -8,7 +8,7 @@ MAINTAINER Oliver Kahrmann <oliver.kahrmann@gmail.com>
 RUN dnf -y update; \
     dnf -y install bash file gcc make pkg-config tar curl unzip git rsync \
     mingw64-gcc mingw64-pkg-config mingw64-crt mingw64-headers mingw64-binutils \
-	glfw; \
+	libX11-devel libXcursor-devel libXrandr-devel libXinerama-devel mesa-libGL-devel libXi-devel; \
     dnf clean all
 
 RUN useradd -ms /bin/bash builduser
